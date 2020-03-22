@@ -59,16 +59,30 @@ function start() {
                 urlReplace.replace("value1=", "value1=" + docEntry);
                 getPODetails.url = urlReplace;
 
-                //     //GET PO WHOLE DETAILS
+                //GET PO WHOLE DETAILS
                 var getPODetailsOptions = JSON.parse(JSON.stringify(getPODetails));
-                //     request(getPODetailsOptions, (err, resp) => {
-                //         if (err) throw new Error(err);
-                //         // console.log(resp.body);
+                request(getPODetailsOptions, (err, resp) => {
+                    if (err) throw new Error(err);
+                    console.log(resp.body);
 
+                    var slBodyPO = {};
+                    slBodyPO.DocumentLines = [];
+                    JSON.parse(resp.body).forEach((e) =>{
+                        var oItem = {};
+                        oItem.ItemCode = e.ItemCode;
+                        oItem.Quantity = e.Quantity;
+                        oItem.PriceAfVat = e.PriceAfVat;
+                        slBodyPO.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
+                    })
 
-                //         //POST IN ENGINE SCRIPT
+                    slBodyPO.CardCode = JSON.parse(resp.body)[0].CardCode;
+                    slBodyPO.NumAtCard = JSON.parse(resp.body)[0].NumAtCard;
 
-                //     });
+                    console.log(slBodyPO);
+
+                    //         //POST IN ENGINE SCRIPT
+
+                });
 
 
             })
