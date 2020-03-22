@@ -50,18 +50,17 @@ function start() {
         request(loginOption, (logerror, logresponse) => {
             if (logerror) console.log(logerror);
             cookies = logresponse.headers["set-cookie"];
-            console.log(logresponse);
-
+            console.log(cookies);
             JSON.parse(response.body).forEach((e) => {
-                //     var docEntry = e.U_aPODocEntry;
-                //     console.log(docEntry);
+                var docEntry = e.U_PODocEntry;
+                console.log(docEntry);
 
-                //     var urlReplace = getPODetails.url;
-                //     urlReplace.replace("value1=", "value1=" + docEntry);
-                //     getPODetails.url = urlReplace;
+                var urlReplace = getPODetails.url;
+                urlReplace.replace("value1=", "value1=" + docEntry);
+                getPODetails.url = urlReplace;
 
                 //     //GET PO WHOLE DETAILS
-                //     var getPODetailsOptions = JSON.parse(JSON.stringify(getPODetails));
+                var getPODetailsOptions = JSON.parse(JSON.stringify(getPODetails));
                 //     request(getPODetailsOptions, (err, resp) => {
                 //         if (err) throw new Error(err);
                 //         // console.log(resp.body);
