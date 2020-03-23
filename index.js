@@ -36,6 +36,16 @@ function start() {
 
     };
 
+    var postingOption = {
+        'method': 'POST',
+        'url': '',
+        'headers': {
+            'Content-Type': 'application/json',
+            'Cookie': ''
+        },
+        'body': ""
+    }
+
     //GET DATA FROM REVIVE VIA XSJS
     request(options, (error, response) => {
         if (error) throw new Error(error);
@@ -80,7 +90,17 @@ function start() {
 
                     console.log(slBodyPO);
 
-                    //         //POST IN ENGINE SCRIPT
+
+                    postingOption.headers.Cookie = cookies;
+                    //POST IN ENGINE SCRIPT FOR BFI
+                    request(postingOption, (errpost, resppost) => {
+                        if (errpost) throw new Error(errpost);
+
+                        
+
+                    });
+
+
 
                 });
 
