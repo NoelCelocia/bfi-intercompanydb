@@ -19,7 +19,7 @@ function start() {
 
     var getPODetails = {
         'method': 'GET',
-        'url': 'https://18.136.35.41:4300/app_xsjs/ExecQuery.xsjs?dbName=REVIVE_APPTECH_INTERNAL&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=&value2&value3&value4',
+        'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=REVIVE_APPTECH_INTERNAL&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=&value2&value3&value4',
         'headers': {
             'Authorization': 'Basic ' + base64XSJSCredential
         }
