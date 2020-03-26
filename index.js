@@ -102,54 +102,6 @@ function start() {
         });
     })
 
-    //POST REQUEST FOR BFI
-    // var postBFI = new Promise((resolve, reject) => {
-    //     console.log("Cookie for " +  postingOption.headers.Cookie);
-    //     request(postingOption, (errpost, resppost) => {
-    //         if (errpost) reject("Error : Request to POST in Engine Script BFI Purchase Order");
-
-    //         if (JSON.parse(resppost.body).error) {
-    //             console.log("BFI " + JSON.parse(resppost.body).error.message.value);
-    //             reject(JSON.parse(resppost.body).error.message.value);
-    //         } else {
-    //             resolve({
-    //                 "Transaction": "Purchase Order",
-    //                 "DocEntry": JSON.parse(resppost.body).SalesOrderDetail.body.DocEntry,
-    //                 "DocNum": JSON.parse(resppost.body).SalesOrderDetail.body.DocNum
-    //             });
-    //         }
-    //     });
-    // });
-
-    // var postREV = new Promise((resolve, reject) => {
-    //     console.log(postingOptionRev.headers.Cookie);
-    //     request(postingOptionRev, (errpost, resppost) => {
-    //         if (errpost) reject("Error : Request to POST in Engine Script REV Sales Order");
-
-    //         if (JSON.parse(resppost.body).error) {
-    //             console.log("REV " + JSON.parse(resppost.body).error.message.value);
-    //             reject(JSON.parse(resppost.body).error.message.value);
-    //         } else {
-    //             resolve({
-    //                 "Transaction": "Sales Order",
-    //                 "DocEntry": JSON.parse(resppost.body).SalesOrderDetail.body.DocEntry,
-    //                 "DocNum": JSON.parse(resppost.body).SalesOrderDetail.body.DocNum
-    //             });
-    //         }
-    //     });
-    // })
-    
-    // Promise.all([
-    //     logsl1,
-    //     logsl2,
-    //     getForSync
-    // ]).then((results) => {
-    //     bfiLoginCookie = results[0];
-    //     revLoginCookie = results[1];
-    //     oGetForSync = results[2];
-
-    // }, allPostingOption);
-
     Promise.all([
         logsl1,
         logsl2,
@@ -209,7 +161,7 @@ function start() {
                     if (errpost) throw new Error("Error : Request to POST in Engine Script BFI Purchase Order");
                     try {
                         if (JSON.parse(resppost.body).error) {
-                            console.log(JSON.parse(resppost.body).error.message.value);
+                            console.log(`SAP Error on Revive PO DocEntry ${docEntry}: ${JSON.parse(resppost.body).error.message.value}  `)
                             //throw new Error(JSON.parse(resppost.body).error.message.value);
                         } else {
                             console.log(JSON.parse(resppost.body).SalesOrderDetail.body.DocNum);
