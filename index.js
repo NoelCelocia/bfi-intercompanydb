@@ -145,7 +145,7 @@ function start() {
                     if (errpost) throw new Error("Error : Request to POST in Engine Script BFI Purchase Order");
                     try {
                         if (JSON.parse(resppost.body).error) {
-                            console.log(JSON.parse(resppost.body).error.message.value);
+                            console.log(`SAP Error on Posting BFI PO for REV PO DocEntry ${docEntry}: ${JSON.parse(resppost.body).error.message.value}  `)
                             //throw new Error(JSON.parse(resppost.body).error.message.value);
                         } else {
                             console.log(JSON.parse(resppost.body).SalesOrderDetail.body.DocNum);
@@ -164,7 +164,7 @@ function start() {
                             console.log(`SAP Error on Revive PO DocEntry ${docEntry}: ${JSON.parse(resppost.body).error.message.value}  `)
                             //throw new Error(JSON.parse(resppost.body).error.message.value);
                         } else {
-                            console.log(JSON.parse(resppost.body).SalesOrderDetail.body.DocNum);
+                            console.log(`Success on posting to Revive Database Sales Order Number ${JSON.parse(resppost.body).SalesOrderDetail.body.DocNum}`);
                         }
                     } catch (err) {
                         console.log(err);
