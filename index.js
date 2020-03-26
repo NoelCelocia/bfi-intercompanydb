@@ -54,7 +54,17 @@ function start() {
 
     var postingOption = {
         'method': 'POST',
-        'url': process.env.SL_BASE_URL + '/script/apptech/PurchaseOrdersBFI',
+        'url': process.env.SL_BASE_URL + '/script/apptech/BFIpurchaseorder',
+        'headers': {
+            'Content-Type': 'application/json',
+            'Cookie': ''
+        },
+        'body': ""
+    }
+
+    var postingOptionRev = {
+        'method': 'POST',
+        'url': process.env.SL_BASE_URL + '/script/apptech/REVsalesorder',
         'headers': {
             'Content-Type': 'application/json',
             'Cookie': ''
@@ -65,7 +75,7 @@ function start() {
     console.log("LOGGING IN...");
     var bfiLoginCookie, revLoginCookie;
 
-    var logsl1 = new Promise((resolve, reject) =>{
+    var logsl1 = new Promise((resolve, reject) => {
         request(loginOption, (logerror, logresponse) => {
             if (logerror) reject("reject");
             resolve(logresponse.headers["set-cookie"]);
@@ -84,7 +94,7 @@ function start() {
 
     var getForSync = new Promise((resolve, reject) => {
         request(options, (error, response) => {
-            if(error) {
+            if (error) {
                 console.log("Error on getForSync");
                 reject("Reject on getForSync");
             }
@@ -92,18 +102,75 @@ function start() {
         });
     })
 
-    
-
     Promise.all([
         logsl1,
         logsl2,
         getForSync
-    ]).then((results)=>{
+    ]).then((results) => {
         bfiLoginCookie = results[0];
         revLoginCookie = results[1];
         oGetForSync = results[2];
-        console.log("oGetForSync");
-        console.log(oGetForSync);
+
+        oGetForSync.forEach((e) => {
+            var docEntry = e.U_PODocEntry;
+
+            var urlReplace = getPODetails.url;
+            urlReplace.replace("value1=", "value1=" + docEntry);
+            getPODetails.url = urlReplace;
+
+            var getPODetailsOptions = JSON.parse(JSON.stringify(getPODetails));
+            request(getPODetailsOptions, (err, resp) => {
+                var slBodyPO = {};
+                slBodyPO.DocumentLines = [];
+                JSON.parse(resp.body).forEach((e) => {
+                    var oItem = {};
+                    oItem.ItemCode = e.ItemCode;
+                    oItem.Quantity = e.Quantity;
+                    oItem.PriceAfVat = e.PriceAfVat;
+                    slBodyPO.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
+                })
+                slBodyPO.CardCode = JSON.parse(resp.body)[0].CardCode;
+                slBodyPO.NumAtCard = JSON.parse(resp.body)[0].NumAtCard;
+
+                postingOption.headers.Cookie = bfiLoginCookie;
+                //DUMMY DATA
+                slBodyPO = {
+                    "CardCode": "V00001",
+                    "DocDate": "2020-03-26",
+                    "NumAtCard": "Node Test",
+                    "DocumentLines": [{
+                        "ItemCode": "RM14-00001",
+                        "Quantity": 4,
+                        "UnitPrice": 2
+                    }]
+                }
+
+                postingOption.body = JSON.stringify(slBodyPO);
+    
+                //POST IN ENGINE SCRIPT FOR BFI
+                request(postingOption, (errpost, resppost) => {
+                    if (errpost) throw new Error("Error : Request to POST in Engine Script BFI Purchase Order");
+                    try{
+                        if (JSON.parse(resppost.body).error){
+                            throw new Error(JSON.parse(resppost.body).error.message.value);
+                        } else {
+                            console.log(JSON.parse(resppost.body).SalesOrderDetail.body.DocNum);  
+                        }
+                    }catch(err){
+                        console.log(err);
+                    }
+                    
+                });
+
+                //POST IN ENGINE SCRIPT FOR REV
+                // request(postingOptionRev, (errpostRev, resppostRev) => {
+                //     if (errpostRev) throw new Error(errpostRev);
+                //     console.log(JSON.parse(resppostRev.body));
+                // })
+
+            })
+        })
+
     });
 
 
@@ -125,7 +192,7 @@ function start() {
         //LOGIN
         var cookies;
         console.log(loginOption);
-        
+
         request(loginOption, (logerror, logresponse) => {
             if (logerror) console.log(logerror);
             cookies = logresponse.headers["set-cookie"];
@@ -136,11 +203,10 @@ function start() {
                 "DocDate": "2020-03-24",
                 "NumAtCard": "Node Test",
                 "DocumentLines": [{
-                        "ItemCode": "RM14-00001",
-                        "Quantity": 1,
-                        "UnitPrice": 123
-                    }
-                ]
+                    "ItemCode": "RM14-00001",
+                    "Quantity": 1,
+                    "UnitPrice": 123
+                }]
             }
 
             postingOption.headers.Cookie = cookies;
