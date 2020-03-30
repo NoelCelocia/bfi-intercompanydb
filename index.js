@@ -115,8 +115,10 @@ function start() {
         postingOption.headers.Cookie = bfiLoginCookie;
         postingOptionRev.headers.Cookie = revLoginCookie;
 
+        console.log(`Numbers of Records: ${oGetForSync.length}`)
         oGetForSync.forEach((e) => {
             var docEntry = e.U_PODocEntry;
+            
 
             var urlReplace = getPODetails.url;
             urlReplace.replace("value1=", "value1=" + docEntry);
@@ -124,20 +126,29 @@ function start() {
 
             var getPODetailsOptions = JSON.parse(JSON.stringify(getPODetails));
             request(getPODetailsOptions, (err, resp) => {
-                var slBodyPO = {};
-                slBodyPO.DocumentLines = [];
+                var bodySalesOrder ={}, bodyPurchaseOrder = {};
+                bodySalesOrder.DocumentLines = [], bodyPurchaseOrder.DocumentLines = [];
+
                 JSON.parse(resp.body).forEach((e) => {
                     var oItem = {};
                     oItem.ItemCode = e.ItemCode;
                     oItem.Quantity = e.Quantity;
                     oItem.PriceAfVat = e.PriceAfVat;
-                    slBodyPO.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
-                })
-                slBodyPO.CardCode = JSON.parse(resp.body)[0].CardCode;
-                slBodyPO.NumAtCard = JSON.parse(resp.body)[0].NumAtCard;
+                    bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
+                    bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
+                });
+                bodySalesOrder.NumAtCard = JSON.parse(resp.body)[0].NumAtCard;
+                bodyPurchaseOrder.NumAtCard = JSON.parse(resp.body)[0].NumAtCard;
+                
+                bodySalesOrder.DocDueDate = JSON.parse(resp.body)[0].DocDueDate;
+                bodyPurchaseOrder.DocDueDate = JSON.parse(resp.body)[0].DocDueDate;
 
-                postingOption.body = JSON.stringify(slBodyPO);
-                postingOptionRev.body = JSON.stringify(slBodyPO);
+                bodySalesOrder.CardCode = process.env.SO_CARDCODE;
+                bodyPurchaseOrder.CardCode = process.env.PO_CARDCODE;
+                
+
+                postingOption.body = JSON.stringify(bodyPurchaseOrder);
+                postingOptionRev.body = JSON.stringify(bodySalesOrder);
                 
 
                 //POST IN ENGINE SCRIPT FOR BFI 
@@ -145,7 +156,7 @@ function start() {
                     if (errpost) throw new Error("Error : Request to POST in Engine Script BFI Purchase Order");
                     try {
                         if (JSON.parse(resppost.body).error) {
-                            console.log(`SAP Error on Posting BFI PO for REV PO DocEntry ${docEntry}: ${JSON.parse(resppost.body).error.message.value}  `)
+                            console.log(`SAP Error on Posting BFI PO for REV PO DocEntry ${docEntry}: \t${JSON.parse(resppost.body).error.message.value}  `)
                             //throw new Error(JSON.parse(resppost.body).error.message.value);
                         } else {
                             console.log(JSON.parse(resppost.body).SalesOrderDetail.body.DocNum);
@@ -161,7 +172,7 @@ function start() {
                     if (errpost) throw new Error("Error : Request to POST in Engine Script BFI Purchase Order");
                     try {
                         if (JSON.parse(resppost.body).error) {
-                            console.log(`SAP Error on Revive PO DocEntry ${docEntry}: ${JSON.parse(resppost.body).error.message.value}  `)
+                            console.log(`SAP Error on Posting REV SO fpr REV PO DocEntry ${docEntry}: \t${JSON.parse(resppost.body).error.message.value}  `)
                             //throw new Error(JSON.parse(resppost.body).error.message.value);
                         } else {
                             console.log(`Success on posting to Revive Database Sales Order Number ${JSON.parse(resppost.body).SalesOrderDetail.body.DocNum}`);
@@ -171,141 +182,11 @@ function start() {
                     }
 
                 });
-
                 
             })
         })
 
     });
-
-
-    return;
-    // return;
-
-    //GET DATA FROM REVIVE VIA XSJS
-    // request(options, (error, response) => {
-    //     if (error) {
-    //         console.log("Error on GET DATA FROM REVIVE VIA XSJS");
-    //         throw new Error(error);
-    //     }
-
-    //     if (JSON.parse(response.body).length === 0) {
-    //         console.log("No records to be sync");
-    //         return;
-    //     }
-    //     // console.log(response.body);
-    //     //LOGIN
-    //     var cookies;
-    //     console.log(loginOption);
-
-    //     request(loginOption, (logerror, logresponse) => {
-    //         if (logerror) console.log(logerror);
-    //         cookies = logresponse.headers["set-cookie"];
-    //         console.log(cookies);
-
-    //         var slBodyPO = {};
-    //         slBodyPO.DocumentLines = [];
-    //         JSON.parse(resp.body).forEach((e) => {
-    //             var oItem = {};
-    //             oItem.ItemCode = e.ItemCode;
-    //             oItem.Quantity = e.Quantity;
-    //             oItem.PriceAfVat = e.PriceAfVat;
-    //             slBodyPO.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
-    //         })
-
-    //         slBodyPO.CardCode = JSON.parse(resp.body)[0].CardCode;
-    //         slBodyPO.NumAtCard = JSON.parse(resp.body)[0].NumAtCard;
-
-    //         slBodyPO = {
-    //             "CardCode": "V00001",
-    //             "DocDate": "2020-03-24",
-    //             "NumAtCard": "Node Test",
-    //             "DocumentLines": [{
-    //                 "ItemCode": "RM14-00001",
-    //                 "Quantity": 1,
-    //                 "UnitPrice": 123
-    //             }]
-    //         }
-
-    //         postingOption.headers.Cookie = cookies;
-    //         postingOption.body = JSON.stringify(slBodyPO);
-    //         //POST IN ENGINE SCRIPT FOR BFI
-    //         request(postingOption, (errpost, resppost) => {
-    //             if (errpost) throw new Error(errpost);
-
-    //             console.log(JSON.parse(resppost.body));
-
-    //         });
-    //         // JSON.parse(response.body).forEach((e) => {
-    //         //     var docEntry = e.U_PODocEntry;
-    //         //     console.log(docEntry);
-
-    //         //     var urlReplace = getPODetails.url;
-    //         //     urlReplace.replace("value1=", "value1=" + docEntry);
-    //         //     getPODetails.url = urlReplace;
-
-    //         //     //GET PO WHOLE DETAILS
-    //         //     var getPODetailsOptions = JSON.parse(JSON.stringify(getPODetails));
-    //         //     request(getPODetailsOptions, (err, resp) => {
-    //         //         if (err) throw new Error(err);
-    //         //         // console.log(resp.body);
-    //         //         var slBodyPO = {};
-    //         //         slBodyPO.DocumentLines = [];
-    //         //         JSON.parse(resp.body).forEach((e) =>{
-    //         //             var oItem = {};
-    //         //             oItem.ItemCode = e.ItemCode;
-    //         //             oItem.Quantity = e.Quantity;
-    //         //             oItem.PriceAfVat = e.PriceAfVat;
-    //         //             slBodyPO.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
-    //         //         })
-
-    //         //         slBodyPO.CardCode = JSON.parse(resp.body)[0].CardCode;
-    //         //         slBodyPO.NumAtCard = JSON.parse(resp.body)[0].NumAtCard;
-
-    //         //         // console.log(slBodyPO);
-
-    //         //         //start of mock data
-    //         //         //bfi
-    //         //         slBodyPO = {
-    //         //             "CardCode": "V00001",
-    //         //             "DocDate": "2020-03-24",
-    //         //             "NumAtCard": "Node Test",
-    //         //             "DocumentLines": [
-    //         //                 {
-    //         //                     "ItemCode": "RM14-00001",
-    //         //                     "Quantity": 1,
-    //         //                     "UnitPrice": 123
-    //         //                 }
-
-    //         //             ]
-    //         //         }
-    //         //         //end of mock data
-
-    //         //         postingOption.headers.Cookie = cookies;
-    //         //         postingOption.body = JSON.stringify(slBodyPO);
-    //         //         //POST IN ENGINE SCRIPT FOR BFI
-    //         //         request(postingOption, (errpost, resppost) => {
-    //         //             if (errpost) throw new Error(errpost);
-
-    //         //             console.log(JSON.parse(resppost.body).SalesOrderDetail.body.DocNum);
-
-    //         //         });
-
-
-
-    //         //     });
-
-
-    //         // })
-
-    //     })
-
-
-    // });
-
-
-
-
 
 }
 
