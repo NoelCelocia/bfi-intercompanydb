@@ -1,7 +1,7 @@
 const request = require('request');
 require('custom-env').env('dev');
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
-
+require("tls").DEFAULT_MIN_VERSION = "TLSv1";
 
 
 function start() {
@@ -76,20 +76,27 @@ function start() {
     var bfiLoginCookie, revLoginCookie;
 
     var logsl1 = new Promise((resolve, reject) => {
-        request(loginOption, (logerror, logresponse) => {
-            if (logerror) reject("reject");
-            resolve(logresponse.headers["set-cookie"]);
-        });
+        try{
+            request(loginOption, (logerror, logresponse) => {
+                if (logerror) reject(logerror);
+                resolve(logresponse.headers["set-cookie"]);
+            });
+        }catch(err){
+            reject("rejectcatchBFI");
+        }
+        
     });
 
     var logsl2 = new Promise((resolve, reject) => {
-        request(loginOptionRev, (logerror2, logresponse2) => {
-            if (logerror2) {
-                console.log("Error on Login Revive")
-                reject("reject")
-            }
-            resolve(logresponse2.headers["set-cookie"]);
-        });
+        try{
+            request(loginOptionRev, (logerror2, logresponse2) => {
+                if (logerror2) reject(logerror2);
+                resolve(logresponse2.headers["set-cookie"]);
+            });
+        }catch(err){
+            reject("rejectcatchREV");
+        }
+        
     });
 
     var getForSync = new Promise((resolve, reject) => {
@@ -155,7 +162,6 @@ function start() {
                 bodySalesOrder.CardCode = process.env.SO_CARDCODE;
                 bodyPurchaseOrder.CardCode = process.env.PO_CARDCODE;
                 
-
                 postingOption.body = JSON.stringify(bodyPurchaseOrder);
                 postingOptionRev.body = JSON.stringify(bodySalesOrder);
                 
@@ -177,6 +183,7 @@ function start() {
                 });
 
                 //POST IN ENGINE SCRIPT FOR REV 
+                //console.log(postingOptionRev.body.DocumentLines);
                 request(postingOptionRev, (errpost, resppost) => {
                     if (errpost) throw new Error("Error : Request to POST in Engine Script REV Sales Order");
                     try {
@@ -193,12 +200,18 @@ function start() {
                 });
                 
             })
+
+            
         })
 
+    }).catch((error)=>{
+        console.log(error);
+        console.log("promisecatch error");
     });
 
 }
 
+//USE PM2 for auto restart
 start();
 
 
