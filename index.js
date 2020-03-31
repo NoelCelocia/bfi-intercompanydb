@@ -121,27 +121,36 @@ function start() {
             
 
             var urlReplace = getPODetails.url;
-            urlReplace.replace("value1=", "value1=" + docEntry);
+            urlReplace = urlReplace.replace("value1=", "value1=" + docEntry);
             getPODetails.url = urlReplace;
+
 
             var getPODetailsOptions = JSON.parse(JSON.stringify(getPODetails));
             request(getPODetailsOptions, (err, resp) => {
                 var bodySalesOrder ={}, bodyPurchaseOrder = {};
                 bodySalesOrder.DocumentLines = [], bodyPurchaseOrder.DocumentLines = [];
-
+                
                 JSON.parse(resp.body).forEach((e) => {
                     var oItem = {};
                     oItem.ItemCode = e.ItemCode;
                     oItem.Quantity = e.Quantity;
-                    oItem.PriceAfVat = e.PriceAfVat;
+                    oItem.UnitPrice = e.Price;
+                    oItem.WarehouseCode = e.WhsCode;
                     bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
                     bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
                 });
                 bodySalesOrder.NumAtCard = JSON.parse(resp.body)[0].NumAtCard;
                 bodyPurchaseOrder.NumAtCard = JSON.parse(resp.body)[0].NumAtCard;
-                
+
+                bodySalesOrder.U_APP_IsDBTran = "1";
+                bodyPurchaseOrder.U_APP_IsDBTran = "1";
+
+                bodySalesOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(resp.body)[0].DocEntry} | DocNum : ${JSON.parse(resp.body)[0].DocNum}`;
+                bodyPurchaseOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(resp.body)[0].DocEntry} | DocNum : ${JSON.parse(resp.body)[0].DocNum}`;
+
                 bodySalesOrder.DocDueDate = JSON.parse(resp.body)[0].DocDueDate;
                 bodyPurchaseOrder.DocDueDate = JSON.parse(resp.body)[0].DocDueDate;
+                bodyPurchaseOrder.DocDate = JSON.parse(resp.body)[0].DocDueDate;
 
                 bodySalesOrder.CardCode = process.env.SO_CARDCODE;
                 bodyPurchaseOrder.CardCode = process.env.PO_CARDCODE;
@@ -168,12 +177,13 @@ function start() {
                 });
 
                 //POST IN ENGINE SCRIPT FOR REV 
+                console.log(postingOptionRev.body.DocumentLines);
                 request(postingOptionRev, (errpost, resppost) => {
-                    if (errpost) throw new Error("Error : Request to POST in Engine Script BFI Purchase Order");
+                    if (errpost) throw new Error("Error : Request to POST in Engine Script REV Sales Order");
                     try {
                         if (JSON.parse(resppost.body).error) {
                             console.log(`SAP Error on Posting REV SO fpr REV PO DocEntry ${docEntry}: \t${JSON.parse(resppost.body).error.message.value}  `)
-                            //throw new Error(JSON.parse(resppost.body).error.message.value);
+                            
                         } else {
                             console.log(`Success on posting to Revive Database Sales Order Number ${JSON.parse(resppost.body).SalesOrderDetail.body.DocNum}`);
                         }
