@@ -177,7 +177,6 @@ function start() {
                 });
 
                 //POST IN ENGINE SCRIPT FOR REV 
-                console.log(postingOptionRev.body.DocumentLines);
                 request(postingOptionRev, (errpost, resppost) => {
                     if (errpost) throw new Error("Error : Request to POST in Engine Script REV Sales Order");
                     try {
