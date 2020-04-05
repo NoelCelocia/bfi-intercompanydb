@@ -13,6 +13,7 @@
     "custom-env": "^2.0.1",
     "dotenv": "^8.2.0",
     "request": "2.88.2",
-    "tls": "0.0.1"
+    "tls": "0.0.1",
+    "sync-request": "^6.1.0"
   }
 }
