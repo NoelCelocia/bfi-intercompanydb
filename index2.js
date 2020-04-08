@@ -160,17 +160,7 @@ let postREV = async function () {
     });
 }
 
-const getUsers = () => {
-    return new Promise((resolve, reject) => {
-        return setTimeout(() => resolve([{
-            id: 'jon'
-        }, {
-            id: 'andrey'
-        }, {
-            id: 'tania'
-        }]), 600)
-    })
-}
+
 
 const asyncForEach = async (array, callback) => {
     for (let index = 0; index < array.length; index++) {
@@ -210,10 +200,17 @@ async function start() {
                     bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
                     bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
                 })
+                bodySalesOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
+                bodyPurchaseOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
+
                 bodtSalesOrder.DocObjectCode = "22";
                 bodySalesOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
                 bodyPurchaseOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
                 console.log(bodySalesOrder);
+
+
+
+
             }
 
             startRowLoop();
