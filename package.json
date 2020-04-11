@@ -10,10 +10,11 @@
   "license": "ISC",
   "dependencies": {
     "axios": "^0.19.2",
+    "chalk": "^4.0.0",
     "custom-env": "^2.0.1",
     "dotenv": "^8.2.0",
     "request": "2.88.2",
-    "tls": "0.0.1",
-    "sync-request": "^6.1.0"
+    "sync-request": "^6.1.0",
+    "tls": "0.0.1"
   }
 }
