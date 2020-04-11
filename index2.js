@@ -3,6 +3,7 @@ require('custom-env').env('dev');
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 require("tls").DEFAULT_MIN_VERSION = "TLSv1";
 
+
 const base64XSJSCredential = Buffer.from(process.env.XSJS_USERNAME + ":" + process.env.XSJS_PASSWORD).toString('base64');
 let bfiCookie = [];
 let revCookie = [];
@@ -37,7 +38,7 @@ let loginOptionREV = {
 
 let getForSyncOption = {
     'method': 'GET',
-    'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=REVIVE_APPTECH_INTERNAL&procName=spAppIntercompany&queryTag=getlogs&value1=0&value2&value3&value4',
+    'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName='+ process.env.REV_COMPANY +'&procName=spAppIntercompany&queryTag=getlogs&value1=0&value2&value3&value4',
     'headers': {
         'Authorization': 'Basic ' + base64XSJSCredential
     }
@@ -61,9 +62,10 @@ let postOptionBFIDraft = {
     'body': ""
 }
 
+//'/script/apptech/BFIpurchaseorder',
 let postOptionBFI = {
     'method': 'POST',
-    'url': process.env.SL_BASE_URL + '/script/apptech/BFIpurchaseorder',
+    'url': process.env.SL_BASE_URL + '/Drafts',
     'headers': {
         'Content-Type': 'application/json',
         'Cookie': ''
@@ -73,7 +75,7 @@ let postOptionBFI = {
 
 let postOptionREV = {
     'method': 'POST',
-    'url': process.env.SL_BASE_URL + '/script/apptech/REVsalesorder',
+    'url': process.env.SL_BASE_URL + '/Orders',
     'headers': {
         'Content-Type': 'application/json',
         'Cookie': ''
@@ -123,7 +125,6 @@ let postBFIDraft = async function () {
     return new Promise((resolve, reject) => {
         request(postOptionBFIDraft, (errpost, resppost) => {
             if (errpost) reject("Error : Request to POST Draft Sales Order");
-
             resolve(resppost);
 
         });
@@ -134,28 +135,34 @@ let postBFI = async () => {
     return new Promise((resolve, reject) => {
         //resolve("asdf");
         request(postOptionBFI, (errpost, resppost) => {
-            if (errpost) return setTimeout(() => reject("Error : Request to POST in Engine Script BFI Purchase Order"), 500);
+            if (errpost) reject("error1"); //return setTimeout(() => reject("Error : Request to POST in Engine Script BFI Purchase Order"), 500);
             if (JSON.parse(resppost.body).error) {
-                return setTimeout(() => reject(`SAP Error on Posting BFI PO from REV PO DocEntry ${docEntry}: \t${JSON.parse(resppost.body).error.message.value}  `), 500);
+                reject(JSON.parse(resppost.body).error); //return setTimeout(() => reject(`SAP Error on Posting BFI PO from REV PO DocEntry ${docEntry}: \t${JSON.parse(resppost.body).error.message.value}  `), 500);
                 //throw new Error(JSON.parse(resppost.body).error.message.value);
             } else {
-                return setTimeout(() => resolve(JSON.parse(resppost.body).BFIPurchaseOrder.body.DocNum), 500);
+                resolve(resppost); //return setTimeout(() => resolve(JSON.parse(resppost.body).BFIPurchaseOrder.body.DocNum), 500);
             }
         });
     });
 }
 
 let postREV = async function () {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => { 
+
         request(postOptionREV, (errpost, resppost) => {
-            if (errpost) reject("Error : Request to POST in Engine Script REV Sales Order");
-            if (JSON.parse(resppost.body).error) {
-                //reject(JSON.parse(resppost.body).error);
-                reject(`SAP Error on Posting REV SO from REV PO DocEntry ${docEntry}: \t${JSON.parse(resppost.body).error.message.value}  `)
-                //throw new Error(JSON.parse(resppost.body).error.message.value);
-            } else {
-                resolve(JSON.parse(resppost.body).SalesOrderDetail.body.DocNum);
+            if (errpost) reject("Error : Request to POST in REV Sales Order");
+            if (JSON.parse(resppost.body).error){ 
+                reject(JSON.parse(resppost.body).error.message.value);
             }
+            
+            resolve("Done");
+            // if (JSON.parse(resppost.body).error) {
+            //     reject(JSON.parse(resppost.body).error);
+            //     //reject(`SAP Error on Posting REV SO from REV PO DocEntry ${docEntry}: \t${JSON.parse(resppost.body).error.message.value}  `)
+            //     //throw new Error(JSON.parse(resppost.body).error.message.value);
+            // } else {
+            //     resolve(JSON.parse(resppost.body).SalesOrderDetail.body.DocNum);
+            // }
         });
     });
 }
@@ -171,207 +178,92 @@ const asyncForEach = async (array, callback) => {
 async function start() {
 
     Promise.all([
-        loginBFI,
-        loginREV,
-        getForSync
-    ]).then((res) => {
-        bfiCookie = res[0];
-        revCookie = res[1];
-        aSyncList = res[2];
+            loginBFI,
+            loginREV,
+            getForSync
+        ]).then((res) => {
+            bfiCookie = res[0];
+            revCookie = res[1];
+            aSyncList = res[2];
 
-        asyncForEach(aSyncList, async (e) => {
-            let U_DocEntry = e.U_PODocEntry;
-            let poDetail = await getDocumentPO(U_DocEntry);
+            asyncForEach(aSyncList, async (e) => {
 
-            // console.log(JSON.parse(poDetail));
+                let U_DocEntry = e.U_PODocEntry;
+                let poDetail = await getDocumentPO(U_DocEntry);
+                // console.log(poDetail);
+                console.log("after getDocumentPO");
 
-            var bodySalesOrder = {},
-                bodyPurchaseOrder = {};
-            bodySalesOrder.DocumentLines = [],
-                bodyPurchaseOrder.DocumentLines = [];
+                var bodySalesOrder = {},
+                    bodyPurchaseOrder = {};
+                bodySalesOrder.DocumentLines = [],
+                    bodyPurchaseOrder.DocumentLines = [];
 
-            const startRowLoop = async () => {
-                await asyncForEach(JSON.parse(poDetail), async (ee) => {
-                    var oItem = {};
-                    oItem.ItemCode = ee.ItemCode;
-                    oItem.Quantity = ee.Quantity;
-                    oItem.UnitPrice = ee.Price;
-                    oItem.WarehouseCode = ee.WhsCode;
-                    bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
-                    bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
-                })
-                bodySalesOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
-                bodyPurchaseOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
+                const startRowLoop = async () => {
+                    console.log("startRowLoop");
+                    
+                    await asyncForEach(JSON.parse(poDetail), async (ee) => {
+                        var oItem = {};
+                        oItem.ItemCode = ee.ItemCode;
+                        oItem.Quantity = ee.Quantity;
+                        oItem.UnitPrice = ee.Price;
+                        oItem.WarehouseCode = ee.WhsCode;
+                        bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
+                        bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
+                    })
+                    //----PURCHASE ORDER DRAFT
+                    bodyPurchaseOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
+                    bodyPurchaseOrder.CardCode = process.env.PO_CARDCODE;
+                    bodyPurchaseOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
+                    bodyPurchaseOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
+                    bodyPurchaseOrder.U_APP_IsDBTran = "1";
+                    bodyPurchaseOrder.DocObjectCode = "22";
+                    postOptionBFI.headers.Cookie = bfiCookie;
+                    postOptionBFI.body = JSON.stringify(bodyPurchaseOrder);
 
-                bodtSalesOrder.DocObjectCode = "22";
-                bodySalesOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
-                bodyPurchaseOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
-                console.log(bodySalesOrder);
+                    //----SALES ORDER
+                    bodySalesOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
+                    bodySalesOrder.CardCode = "C1000061";
+                    bodySalesOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
+                    bodySalesOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
+                    bodySalesOrder.U_APP_IsDBTran = "1";
+                    postOptionREV.headers.Cookie = revCookie;
 
+                    postOptionREV.body = JSON.stringify(bodySalesOrder);
+                    console.log(postOptionREV.body);
 
+                }
 
+                await startRowLoop();
 
-            }
+                console.log("after startRowLoop");
 
-            startRowLoop();
-            
+                await postBFI()
+                .then((res) => {
+                    console.log(`BFI Purchase Order Draft Number : ${JSON.parse(res.body).DocEntry}`); 
+                }).catch((err) => {
+                    console.log(err);
+                });
 
+                await postREV()
+                .then((res) => {
+                    console.log(`REV Sales Order Number : ${JSON.parse(res.body).DocEntry}`);
+                }).catch((err) => {
+                    console.log(err);
+                });
+                
+                console.log(`Done processing ${e.U_PODocEntry}`);
+                
 
-            // console.log(JSON.parse(poDetail)[0].DocNum);
-            console.log("-------");
-            return;
+                // // console.log(JSON.parse(poDetail)[0].DocNum);
+                // console.log("-------");
 
-
-
-
-            asyncForEach(poDetail, async (ee) => {
-                var oItem = {};
-                oItem.ItemCode = ee.ItemCode;
-                oItem.Quantity = ee.Quantity;
-                oItem.UnitPrice = ee.Price;
-                oItem.WarehouseCode = ee.WhsCode;
-                bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
-                bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
             })
 
-            bodySalesOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
-            bodyPurchaseOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
-
-            bodySalesOrder.U_APP_IsDBTran = "1";
-            bodyPurchaseOrder.U_APP_IsDBTran = "1";
-
-            bodySalesOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
-            bodyPurchaseOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
-
-            bodySalesOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
-            //--
-            bodyPurchaseOrder.DocObjectCode = "22";
-            bodyPurchaseOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
-            bodyPurchaseOrder.DocDate = JSON.parse(poDetail)[0].DocDueDate;
-
-            bodySalesOrder.CardCode = process.env.SO_CARDCODE;
-            bodyPurchaseOrder.CardCode = process.env.PO_CARDCODE;
-
-            postOptionBFI.body = JSON.stringify(bodyPurchaseOrder);
-            postOptionBFIDraft.body = JSON.stringify(bodyPurchaseOrder);
-            postOptionREV.body = JSON.stringify(bodySalesOrder);
-
-            postOptionREV.headers.Cookie = revCookie;
-            postOptionBFI.headers.Cookie = bfiCookie;
-            postOptionBFIDraft.headers.Cookie = bfiCookie;
-
-
-
-        })
-
-        // for (let i = 0; i < aSyncList.length; i++) {
-        //     let U_DocEntry = aSyncList[i].U_PODocEntry;
-
-        //GET PO DETAILS
-        // getDocumentPO(U_DocEntry).then((res) => {
-
-        //     var bodySalesOrder = {},
-        //         bodyPurchaseOrder = {};
-        //     bodySalesOrder.DocumentLines = [],
-        //         bodyPurchaseOrder.DocumentLines = [];
-
-        //     JSON.parse(res).forEach((e) => {
-        //         var oItem = {};
-        //         oItem.ItemCode = e.ItemCode;
-        //         oItem.Quantity = e.Quantity;
-        //         oItem.UnitPrice = e.Price;
-        //         oItem.WarehouseCode = e.WhsCode;
-        //         bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
-        //         bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
-        //     })
-
-        //     bodySalesOrder.NumAtCard = JSON.parse(res)[0].NumAtCard;
-        //     bodyPurchaseOrder.NumAtCard = JSON.parse(res)[0].NumAtCard;
-
-        //     bodySalesOrder.U_APP_IsDBTran = "1";
-        //     bodyPurchaseOrder.U_APP_IsDBTran = "1";
-
-        //     bodySalesOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(res)[0].DocEntry} | DocNum : ${JSON.parse(res)[0].DocNum}`;
-        //     bodyPurchaseOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(res)[0].DocEntry} | DocNum : ${JSON.parse(res)[0].DocNum}`;
-
-        //     bodySalesOrder.DocDueDate = JSON.parse(res)[0].DocDueDate;
-        //     //--
-        //     bodyPurchaseOrder.DocObjectCode = "22";
-        //     bodyPurchaseOrder.DocDueDate = JSON.parse(res)[0].DocDueDate;
-        //     bodyPurchaseOrder.DocDate = JSON.parse(res)[0].DocDueDate;
-
-        //     bodySalesOrder.CardCode = process.env.SO_CARDCODE;
-        //     bodyPurchaseOrder.CardCode = process.env.PO_CARDCODE;
-
-        //     postOptionBFI.body = JSON.stringify(bodyPurchaseOrder);
-        //     postOptionBFIDraft.body = JSON.stringify(bodyPurchaseOrder);
-        //     postOptionREV.body = JSON.stringify(bodySalesOrder);
-
-        //     postOptionREV.headers.Cookie = revCookie;
-        //     postOptionBFI.headers.Cookie = bfiCookie;
-        //     postOptionBFIDraft.headers.Cookie = bfiCookie;
-
-
-        //     postBFIDraft().then((res) => {
-        //         console.log(`BFO Purchase Order Draft Number : ${JSON.parse(res.body).DocEntry}`);
-        //         var draftPODocEntry = JSON.parse(res.body).DocEntry;
-
-        //         const test = async () => {
-        //             let users = await getUsers();
-        //             console.log(users);
-        //             console.log("-------");
-        //         }
-
-        //         test();
-
-        //         // 
-        //         // 
-        //         // let users = await getUsers();
-
-        //         // Promise.all(
-        //         //     users.map(async user => { 
-        //         //       console.log(user) 
-        //         //     })
-        //         //   )
-        //         // console.log(users);
-        //     }).catch((err) => {
-        //         console.log(err);
-        //     });
-
-        //     // let docNum = await postBFI();
-        //     // console.log(docNum);
-
-        //     // postREV().then((res) => {
-        //     //     console.log(`REV Sales Order DocNum : ${res}`);
-
-        //     //     postBFI().then((resbfi) => {
-        //     //         console.log(`BFI Purchase Order DocNum : ${resbfi}`);
-        //     //     }).catch((errbfi) => {
-        //     //         console.log("error postBFI");
-        //     //     })
-
-        //     // }).catch((err) => {
-        //     //     console.log("error postREV");
-        //     // })
-
-        //     // var returnVal = syncrequest('POST',
-        //     //     process.env.bydurl + "/sap/byd/odata/cust/v1/c_productservice/ServiceProductCollection?" +
-        //     //     "$filter=InternalID eq '" + sTransTypeFee + "'&$expand=ServiceProductSalesProcessInformation", {
-        //     //         headers: {
-        //     //             'Accept': 'application/json',
-        //     //             'Authorization': 'Basic ' + encryptedCred
-        //     //         }
-        //     //     }
-        //     // );
-
-
-        // });
-
-        // }
-
-    }).catch((err) => {
-        console.log(err);
-    });
+        }).catch((err) => {
+            console.log(err);
+        });
+        
+    
 
 }
 
