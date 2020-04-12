@@ -147,6 +147,24 @@ let removeDraft = async function (sPostedDraft, cookie) {
     });
 }
 
+let addDraft = async function (sPostedDraft, cookie) {
+    return new Promise((resolve, reject)=> {
+        let addDraftOption = {};
+        addDraftOption.method = "POST";
+        addDraftOption.url = `${process.env.SL_BASE_URL}/DraftsService_SaveDraftToDocument`;
+        addDraftOption.headers["Content-Type"] = "application/json";
+        removeDraftOption.headers.Cookie = cookie;
+        request(removeDraftOption, (err, res) => {
+            if (err) reject({
+                "errorCode": "-1002",
+                "err": JSON.stringify(err)
+            });
+            resolve(res);
+        })
+
+    });
+}
+
 let postBFI = async () => {
     return new Promise((resolve, reject) => {
         //resolve("asdf");
@@ -162,28 +180,18 @@ let postBFI = async () => {
     });
 }
 
-let postREV = async function () {
+let postREV = async () => {
     return new Promise((resolve, reject) => {
 
         request(postOptionREV, (errpost, resppost) => {
-            if (errpost) reject("Error : Request to POST in REV Sales Order");
+            if (errpost) resolve({error: "-1003", errorDesc: errpost});
             if (JSON.parse(resppost.body).error) {
-                reject(JSON.parse(resppost.body).error.message.value);
+                resolve({error: "-1004", errorDesc: JSON.parse(resppost.body).error});
             }
-
-            resolve("Done");
-            // if (JSON.parse(resppost.body).error) {
-            //     reject(JSON.parse(resppost.body).error);
-            //     //reject(`SAP Error on Posting REV SO from REV PO DocEntry ${docEntry}: \t${JSON.parse(resppost.body).error.message.value}  `)
-            //     //throw new Error(JSON.parse(resppost.body).error.message.value);
-            // } else {
-            //     resolve(JSON.parse(resppost.body).SalesOrderDetail.body.DocNum);
-            // }
+            resolve(resppost); 
         });
     });
 }
-
-
 
 const asyncForEach = async (array, callback) => {
     for (let index = 0; index < array.length; index++) {
@@ -249,29 +257,29 @@ async function start() {
 
             }
 
-            await startRowLoop();
+            await startRowLoop(); 
+            let  postBFIres = await postBFI();
+            sPostedDraftDocEntry = JSON.parse(res.body).DocEntry;
+            let postREVres = await postREV();
+            
+            if (JSON.parse(postREVres).error){
+                //let deleteDraftBFIres = await removeDraft(sPostedDraftDocEntry, bfiCookie);
+                //console.log(deleteDraftBFIres);
+            }
 
-            await postBFI()
-                .then((res) => {
-                    sPostedDraftDocEntry = JSON.parse(res.body).DocEntry;
-                    console.log(chalk.green(`BFI Purchase Order Draft Number : ${JSON.parse(res.body).DocEntry}`));
+            // await postBFI()
+            //     .then((res) => {
+            //         sPostedDraftDocEntry = JSON.parse(res.body).DocEntry;
+            //         console.log(chalk.green(`BFI Purchase Order Draft Number : ${JSON.parse(res.body).DocEntry}`));
 
-                    await postREV()
-                        .then((res) => {
-                            console.log(`REV Sales Order Number : ${JSON.parse(res.body).DocEntry}`);
-                        }).catch((err) => {
-                            await removeDraft(sPostedDraftDocEntry)
-                                .then((res) => {
+            //         await postREV();
+                        
 
-                                }).catch((err) => {
-
-                                });
-                            console.log(chalk.red(err));
-                        });
-
-                }).catch((err) => {
-                    console.log(err);
-                });
+            //     }).then((res) => {
+            //         console.log(res);
+            //     }).catch((err) => {
+            //         console.log(err);
+            //     });
 
             // await postREV()
             // .then((res) => {
