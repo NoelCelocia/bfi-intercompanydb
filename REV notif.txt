@@ -1,0 +1,781 @@
+CREATE PROCEDURE SBO_SP_TransactionNotification
+(
+	in object_type nvarchar(30), 				-- SBO Object Type
+	in transaction_type nchar(1),			-- [A]dd, [U]pdate, [D]elete, [C]ancel, C[L]ose
+	in num_of_cols_in_key int,
+	in list_of_key_cols_tab_del nvarchar(255),
+	in list_of_cols_val_tab_del nvarchar(255)
+)
+LANGUAGE SQLSCRIPT
+AS
+-- Return values
+error  int;				-- Result (0 for no error)
+error_message nvarchar (200); 		-- Error string to be displayed
+
+--------------------------------------------------------------------------------------------------------------------------------
+--MASTER DATA
+ObjType, LicTradNum, Address, ECVatGroup, DpmClear, UOMCode, UOMName, SerName varchar(32);
+CardName, Street, CardFName, ItemName, BuyUnitMsr, InvtyUOM, SalUnitMsr varchar(100);
+GroupCode, UserSign, UserSign2, Count1, TransId, MinLevel, ItmsGrpCod, Series integer;
+frozenFor, ItemType varchar(10);
+isDBTran varchar(5);
+Cardtype varchar(1);
+CreditLine, Min1 decimal(19,6);
+CardCode, ControlAcct, AdvAcct varchar(15);
+Invntitem, PrchseItem, SellItem, PlanningSys, Prcmntmtd, PlaningSys nvarchar(1);
+GroupName varchar(30);
+FRGNNAME varchar(30);
+GroupNum varchar(30);
+DataSrc varchar(5);
+
+
+--TRANSACTIONS
+NumAtCard, Reason, Remarks, AcctName, Footer, NumAtCard2 varchar(100);
+Project, ProjDet, OcrCode, OcrCode2, OcrCode3, OcrCode4, OcrCode5, VatGroup, BaseRef, WTCODE, WddStatus varchar(32); 
+PrjRelvnt, Dim1Relvnt, Dim2Relvnt, Dim3Relvnt, Dim4Relvnt, Dim5Relvnt, DocType nvarchar(1);
+ItemCode varchar(50);
+Linetotal, DraftQty, DutiableValue, ExemptCharges, LandedCost decimal(19,6);
+Status varchar(10);
+DocStatus, Canceled, Printed varchar(1);
+AtcEntry, LineNum, UGPentry, Owner, DocEntry, DocNum integer;
+AcctCode varchar(15);
+BaseQty, MainQty, OpenQty decimal(18,6);
+ItemName1 nvarchar(100);
+SellerName, EntryNo, ORNumber varchar(25);
+sessmentDate, ImportDate Date;
+OriginCountry varchar(30);
+Comments varchar(254);
+
+--ADDITIONAL
+ReqName, FreeTxt varchar(100);
+Branch, Department, BaseType, U_APP_RevPONo, U_APP_PORevisionNo int;
+U_APP_ActualStartTime, U_APP_ActualEndTime, U_APP_RevPO varchar(10);
+DocTotal,Total, CreditLimit decimal(19,2);
+OriginType, TranType varchar(1);
+U_APP_ReasonForRejectItems varchar(20);
+--------------------------------------------------------------------------------------------------------------------------------
+
+begin
+
+error := 0;
+error_message := N'Ok';
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+--	ADD	YOUR	CODE	HERE
+
+--------------------------------------------------------------------------------------------------------------------------------
+--Required Field in BP Master Data (TEMPLATED:FAYE201611124)
+IF :object_type = '2' AND (:transaction_type = 'A' OR :transaction_type = 'U') THEN 
+SELECT CAST(A."ObjType" as varchar(32)), A."CardName", A."LicTradNum", A."GroupCode",A."ECVatGroup"
+, A."frozenFor" ,A."UserSign", A."UserSign2", A."DpmClear", A."CardType" ,A."CreditLine",A."CardFName"
+INTO ObjType, CardName, LicTradNum, GroupCode, ECVatGroup, frozenFor, UserSign , UserSign2, Dpmclear, Cardtype, CreditLine, CardFName
+FROM "OCRD" A 
+WHERE A."CardCode" = list_of_cols_val_tab_del;
+
+	IF :frozenFor = 'N' THEN
+		IF IFNULL(:CardName,'') = '' THEN
+		error := 100001;
+		error_message := 'BP Name is required, please indicate!';
+		ELSE IF IFNULL(:DpmClear,'') = '' THEN
+			error := 100002;
+			error_message := 'Downpayment Clearing Account is required, please indicate!';
+			END IF;
+		END IF;
+	END IF;
+END IF;
+----------------------------------------------------------------------------------------------------------------------------------------------------
+--Blocking of double BP Name and TIN should contain 15/17 characters (TEMPLATED:FAYE201611124)
+IF :object_type = '2' AND (:transaction_type = 'A' OR :transaction_type = 'U') THEN
+SELECT "CardName", "CardType", "LicTradNum" INTO CardName, CardType, LicTradNum
+FROM "OCRD"
+WHERE "CardCode" = list_of_cols_val_tab_del AND "frozenFor" = 'N';
+
+SELECT COUNT("CardCode") INTO Count1
+FROM "OCRD"
+WHERE "CardCode" = list_of_cols_val_tab_del AND "frozenFor" = 'N';
+	IF Count1 > 1 THEN
+		error := 100003;
+		error_message := 'BP Name already exists, please check!';
+	END IF;
+	ELSE IF (LENGTH(LicTradNum) != '15' OR LENGTH(LicTradNum) != '17') THEN
+		error := 100004;
+		error_message := 'TIN must contain 15 or 17 (for branches) characters, please check!';
+	END IF;
+END IF;
+--------------------------------------------------------------------------------------------------------------------------------
+--Blocking of duplicate Item Name  (TEMPLATED:FAYE201611124)
+IF :object_type = '4' AND (:transaction_type = 'A' OR :transaction_type = 'U') THEN
+SELECT "ItemName" INTO ItemName
+FROM "OITM"
+WHERE "ItemCode" = list_of_cols_val_tab_del AND "frozenFor" = 'N';
+
+SELECT COUNT("ItemCode") INTO Count1
+FROM "OITM"
+WHERE "ItemCode" = list_of_cols_val_tab_del AND "frozenFor" = 'N';
+	IF Count1 > 1 THEN
+		error := 100003;
+		error_message := 'Item Description already exists, please check!';
+	
+	END IF;
+END IF;
+------------------------------------------------------------------------------------------------------------------------------
+
+--IF ((:transaction_type = 'A') AND :object_type = '13' and error = 0)
+--THEN 
+	--SELECT COUNT(a."DocEntry") INTO Count1 FROM OINV a 
+	--INNER JOIN OCRD B ON a."CardCode" = b."CardCode"  
+		--WHERE a."DocEntry" = list_of_cols_val_tab_del AND B."CardCode" like 'KCC%' AND B."CardCode" like 'UNAHCO%' AND ISNULL(a."NumAtCard",'') = '';
+			 
+		--IF Count1 > 0 THEN
+			--error := 130002;
+			--error_message := 'Customer Reference is missing';
+		--END IF;
+--END IF;
+------------------------------------------------------------------------------------------------------------------------------------------------------
+--Block GRPO w/o PO cannot add stand alone
+IF ((:transaction_type = 'A' ) AND :object_type = '20' and error = 0) THEN
+
+    SELECT COUNT (a."DocEntry") INTO Count1 FROM PDN1 a
+    WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL (a."BaseRef",'')='';
+        IF COUNT1 > 0 THEN 
+            error := 130003;
+            error_message := 'GRPO cannot be created without base document';
+        END IF;
+        
+END IF;
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+---Block GRPO if GRPO Quantity greater than PO Quantity
+IF ((:transaction_type = 'A') AND :object_type = '20' and error = 0) THEN
+    SELECT COUNT (*) INTO Count1 FROM PDN1 a
+    INNER JOIN POR1 b on a."BaseEntry" = b."DocEntry"
+	WHERE a."DocEntry" = list_of_cols_val_tab_del
+	and a."Quantity" > b."Quantity";
+        	IF Count1 > 0 THEN 
+           		error := 130004;
+            	error_message := 'GRPO Quantity is greater than PO Quantity!';
+           END IF;
+END IF;  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--Block A/P Invoice if without Based documents
+
+IF ((:transaction_type = 'A' ) AND :object_type = '18' and error = 0) THEN
+
+    SELECT COUNT (*) INTO Count1 FROM PCH1 a INNER JOIN OPCH b ON a."DocEntry" = b."DocEntry"
+    WHERE a."DocEntry" = list_of_cols_val_tab_del and b."DocType" = 'I'
+   	AND IFNULL (a."BaseRef",'')='';
+        IF COUNT1 > 0 THEN 
+            error := 130005;
+            error_message := 'APV cannot be created without based documents';
+        END IF;
+
+END IF; 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--Block creation of AP Invoice if Vendor Reference is Blank
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '18' and error = 0) THEN
+
+SELECT COUNT (a."DocEntry") INTO Count1 FROM OPCH a
+     WHERE a. "DocEntry" = list_of_cols_val_tab_del AND IFNULL (a."NumAtCard",'') = '';
+        IF Count1 > 0 THEN
+           error := 130006;
+           error_message := 'No reference indicated';
+        END IF;  
+           
+END IF;
+-----------------------------------------------------------------------------------------------------------------------
+--Blocking of AP Invoice if Dimensions are Blank (JP)
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '18' and error = 0) THEN
+ 	SELECT COUNT(a."DocEntry") INTO Count1 FROM PCH1 a 
+ 	INNER JOIN OPCH B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130007;
+			error_message := 'Kindly specify a Division';
+		END IF;
+	
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM PCH1 a 
+ 	INNER JOIN OPCH B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode2",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130008;
+			error_message := 'Kindly specify a Group';
+		END IF;
+		
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM PCH1 a 
+ 	INNER JOIN OPCH B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode3",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130009;
+			error_message := 'Kindly specify a Operating Segment';
+		END IF;
+	
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM PCH1 a 
+ 	INNER JOIN OPCH B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode4",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130010;
+			error_message := 'Kindly specify a Farming Activities';
+		END IF;
+END IF;
+
+------------------------------------------------------------------------------------------------------------------------------------------
+
+--Block creation of AR Invoice for KCC and UNAHCO if Customer Reference is Blank
+--IF ((:transaction_type = 'A' ) AND :object_type = '13' and error = 0) THEN
+
+--SELECT COUNT (a."DocEntry") INTO Count1 FROM OINV a
+    --INNER JOIN OCRD b ON a."CardCode" = b."CardCode"
+     --WHERE a. "DocEntry" = list_of_cols_val_tab_del AND a."CardCode" = 'KCC' AND a."CardCode" like 'UNAHCO%' AND IFNULL (a."NumAtCard",'') = '';
+        --IF Count1 > 0 THEN
+          -- error := 130007;
+           --error_message := 'No reference indicated';
+        --END IF;  
+           
+--END IF;
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+---Block creation of AP Invoice if COA field is Blank
+--IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '18' and error = 0) THEN
+
+--SELECT COUNT (a."DocEntry") INTO Count1 FROM PCH1 a
+     --WHERE a. "DocEntry" = list_of_cols_val_tab_del AND IFNULL (a."U_APP_COANo",'') = '';
+        --IF Count1 > 0 THEN
+           --error := 130009;
+           --error_message := 'No COA indicated';
+        --END IF;  
+           
+--END IF;
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+---Block creation of AP Invoice if RMAF field is Blank
+--IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '18' and error = 0) THEN
+
+--SELECT COUNT (a."DocEntry") INTO Count1 FROM PCH1 a
+     --WHERE a. "DocEntry" = list_of_cols_val_tab_del AND IFNULL (a."U_APP_RMAFNo",'') = '';
+       -- IF Count1 > 0 THEN
+          -- error := 130009;
+          -- error_message := 'No RMAF Number indicated';
+        --END IF;  
+           
+--END IF;
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+---LSC 01/15/2019 Block Purchase Order if Section and Department is blank and Non Inventory Item
+/*IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '22' and error = 0) THEN
+ 	SELECT COUNT(a."DocEntry") INTO Count1 FROM POR1 a 
+ 	INNER JOIN OPOR B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode2",'') = '';  
+		IF Count1 > 0 THEN
+			error := 147001;
+			error_message := 'Kindly specify a Group';
+		END IF;
+		
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM POR1 a 
+	INNER JOIN OPOR B ON a."DocEntry" = b."DocEntry" 
+	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode",'') = '';  
+		IF Count1 > 0 THEN
+			error := 147002;
+			error_message := 'Kindly specify a Division' ;
+		END IF;*/
+		
+	/*SELECT COUNT(a."DocEntry") INTO Count1 FROM POR1 a 
+	INNER JOIN OPOR B ON a."DocEntry" = b."DocEntry" 
+	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode3",'') = '';  
+		IF Count1 > 0 THEN
+			error := 147003;
+			error_message := 'Kindly specify a Operating Segment' ;
+		END IF;
+
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM POR1 a 
+	INNER JOIN OPOR B ON a."DocEntry" = b."DocEntry" 
+	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode4",'') = '';  
+		IF Count1 > 0 THEN
+			error := 147004;
+			error_message := 'Kindly specify a Farming Activities' ;
+		END IF;
+END IF;
+*/
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+---LSC 01/15/2019 Block Purchase Order if Section and Department is blank and Non Inventory Item
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '1470000113' and error = 0) THEN
+ 	SELECT COUNT(a."DocEntry") INTO Count1 FROM PRQ1 a 
+ 	INNER JOIN OPRQ B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(B."Comments",'') = '';  
+		IF Count1 > 0 THEN
+			error := 147005;
+			error_message := 'Kindly specify remarks';
+		END IF;
+		
+	
+END IF;
+--------------------------------------------------------------------------------------
+--Blocking of BP Master Data without Federal Tax ID  (JP)
+IF :object_type = '2' AND (:transaction_type = 'A' OR :transaction_type = 'U') THEN
+SELECT COUNT("LicTradNum") INTO Count1
+FROM "OCRD"
+WHERE "CardCode" = list_of_cols_val_tab_del;
+	IF Count1 = 0 THEN
+		error := 100004;
+		error_message := 'Please indicate Federal Tax ID!';
+	END IF;
+END IF;
+-------------------------------------------------------------------------------------------------------------------
+--CODL 03/13/20 Blocking of BP Master Data with Federal Tax ID not more than 15-17 characters
+IF :object_type = '2' AND (:transaction_type = 'A' OR :transaction_type = 'U') THEN
+SELECT "LicTradNum" INTO LicTradNum
+FROM "OCRD"
+WHERE "CardCode" = list_of_cols_val_tab_del;
+	IF LENGTH (:LicTradNum) <> '15' AND LENGTH (:LicTradNum) <> '17'  THEN
+		error := 147012;
+		error_message := 'TIN should be 15-17 characters!';
+	END IF;
+END IF;
+
+-----------------------------------------------------------------------------------------------
+---JPCP 03/13/2020 Blocking of PO and PO-Draft without PR/PQ Reference
+/*
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '22' and error = 0) THEN
+SELECT a."BaseRef", a."DocEntry" INTO BaseRef, DocEntry FROM POR1 a
+INNER JOIN OPOR b ON a."DocEntry" = b."DocEntry"
+WHERE b."DocEntry" = list_of_cols_val_tab_del;
+	IF IFNULL(:BaseRef,'') = '' THEN
+		error := 147008;
+		error_message := 'Purchase Order needs a PR/PQ reference!';
+	END IF;
+END IF;
+*/
+/*
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '112' and error = 0) THEN
+SELECT a."BaseRef", a."DocEntry", b."ObjType" INTO BaseRef, DocEntry, ObjType FROM DRF1 a
+INNER JOIN ODRF b ON a."DocEntry" = b."DocEntry"
+WHERE b."DocEntry" = list_of_cols_val_tab_del;
+	IF :ObjType = '22' THEN
+		IF IFNULL(:BaseRef,'') = '' THEN
+			error := 147009;
+			error_message := 'Purchase Order needs a PR/PQ reference!';
+		END IF;
+	END IF;	
+END IF;
+
+*/
+---------------------------------------------------------------------------------------------------------------------
+--JCP 03/12/2020 Blocking of PR without Remarks
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '1470000113' and error = 0) THEN
+SELECT "Comments", "DocEntry" INTO Comments, DocEntry FROM OPRQ
+WHERE "DocEntry" = list_of_cols_val_tab_del;
+	IF IFNULL(:Comments,'') = '' THEN
+		error := 147005;
+		error_message := 'Kindly specify remarks';
+	END IF;
+END IF;
+------------------------------------------------------------------------------------------------------------------
+---CODL 03/12/2020 Blocking of PQ and PQ-Draft without PR Reference
+
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '540000006' and error = 0) THEN
+SELECT a."BaseRef", a."DocEntry" INTO BaseRef, DocEntry FROM PQT1 a
+INNER JOIN OPQT b ON a."DocEntry" = b."DocEntry"
+WHERE a."DocEntry" = list_of_cols_val_tab_del;
+	IF IFNULL(:BaseRef,'') = '' THEN
+		error := 147006;
+		error_message := 'Quotation needs a PR reference!';
+	END IF;
+END IF;
+
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '112' and error = 0) THEN
+SELECT a."BaseRef", a."DocEntry", b."ObjType" INTO BaseRef, DocEntry, ObjType FROM DRF1 a
+INNER JOIN ODRF b ON a."DocEntry" = b."DocEntry"
+WHERE a."DocEntry" = list_of_cols_val_tab_del;
+	IF  :ObjType = '540000006' THEN
+		IF IFNULL(:BaseRef,'') = '' THEN
+			error := 147007;
+			error_message := 'Draft Quotation needs a PR reference!';
+		END IF;
+	END IF;
+END IF;
+
+-------------------------------------------------------------------------------------------------------------------
+IF :object_type = '4' AND (:transaction_type = 'A' ) THEN
+SELECT a."UgpEntry" INTO UOMCode
+FROM OITM a
+LEFT JOIN OUGP b ON a."UgpEntry" = b."UgpEntry"
+WHERE a."ItemCode" = list_of_cols_val_tab_del;
+	IF :UOMCode = '-1'  THEN
+		error := 147013;
+		error_message := 'Manual UOM Group Code is not allowed!';
+	END IF;
+END IF;
+-------------------------------------------------------------------------------------------------------------------
+IF :object_type = '4' AND (:transaction_type = 'A' ) THEN
+SELECT b."UgpCode",a."ItemCode" INTO UOMName, ItemCode
+FROM OITM a
+LEFT JOIN OUGP b ON a."UgpEntry" = b."UgpEntry"
+WHERE a."ItemCode" = list_of_cols_val_tab_del;
+	IF :UOMName <> :ItemCode  THEN
+		error := 147014;
+		error_message := 'UOM Group Code should be the same as ItemCode!';
+	END IF;
+END IF;
+
+----------------------------------------------------------------------------------------------------------------------
+/*
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '22' and error = 0) THEN
+	SELECT b."OcrCode",b."OcrCode2",b."OcrCode3",b."OcrCode4",b."OcrCode5"
+	INTO OcrCode, OcrCode2, OcrCode3, OcrCode4, OcrCode5
+	FROM OPOR a
+	INNER JOIN POR1 b ON a."DocEntry" = b."DocEntry" 
+	WHERE a."DocEntry" = list_of_cols_val_tab_del;
+		IF IFNULL(:OcrCode,'') = '' THEN
+			error := 147015;
+			error_message := 'Division code is required!';
+		ELSE IF IFNULL(:OcrCode2,'') = '' THEN
+			error := 147015;
+			error_message := 'Group code is required!';
+		
+		END IF;
+		END IF;				
+END IF;
+*/
+-------------------------------------------------------------------------------------
+--Creating AP Credit Memo without AP reference 3/17/2020
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '19' and error = 0) THEN
+SELECT a."BaseRef", a."DocEntry",b."DocType" INTO BaseRef, DocEntry, DocType FROM RPC1 a
+INNER JOIN ORPC b ON a."DocEntry" = b."DocEntry"
+WHERE a."DocEntry" = list_of_cols_val_tab_del;
+	IF :DocType = 'I' THEN
+		IF IFNULL(:BaseRef,'') = '' THEN
+			error := 147024;
+			error_message := 'You cannot allowed create AP Credit Memo document without APV reference!';
+		END IF;
+	END IF;
+END IF;
+
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '112' and error = 0) THEN
+SELECT a."BaseRef", a."DocEntry", b."ObjType" INTO BaseRef, DocEntry, ObjType FROM DRF1 a
+INNER JOIN ODRF b ON a."DocEntry" = b."DocEntry"
+WHERE a."DocEntry" = list_of_cols_val_tab_del;
+	IF  :ObjType = '19' THEN
+		IF IFNULL(:BaseRef,'') = '' THEN
+			error := 147025;
+			error_message := 'You cannot allowed create AP Credit Memo document without APV reference!';
+		END IF;
+	END IF;
+END IF;
+
+--------------------------------------------------------------------------------------------------------------------
+--Creating GooD Return without GRPO reference
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '21' and error = 0) THEN
+SELECT a."BaseRef", a."DocEntry" INTO BaseRef, DocEntry FROM RPD1 a
+INNER JOIN ORPD b ON a."DocEntry" = b."DocEntry"
+WHERE b."DocEntry" = list_of_cols_val_tab_del;
+	IF IFNULL(:BaseRef,'') = '' THEN
+		error := 147018;
+		error_message := 'Goods Return needs a GRPO reference!';
+	END IF;
+END IF;
+
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '112' and error = 0) THEN
+SELECT a."BaseRef", a."DocEntry", b."ObjType" INTO BaseRef, DocEntry, ObjType FROM DRF1 a
+INNER JOIN ODRF b ON a."DocEntry" = b."DocEntry"
+WHERE b."DocEntry" = list_of_cols_val_tab_del;
+	IF :ObjType = '21' THEN
+		IF IFNULL(:BaseRef,'') = '' THEN
+			error := 147019;
+			error_message := 'Goods Return needs a GRPO reference!';
+		END IF;
+	END IF;	
+END IF;
+--------------------------------------------------------------------------------------------------------
+--CODL 03/17/2020 Blocking of Duplicate BP Name 
+IF (:transaction_type='A' or :transaction_type='U') AND (:Object_type = '2') THEN
+	SELECT "CardName" INTO CardName
+	FROM OCRD
+	WHERE "CardCode"=:list_of_cols_val_tab_del;
+		
+		SELECT COUNT(*) INTO Count1 FROM OCRD WHERE "CardName" = :CardName;
+
+			IF Count1 > 1 THEN
+				error := 147022;
+				error_message := 'BP Name already exists, please check!';
+			END IF;
+
+END IF;
+
+---------------------------------------------------------------------------------------------------------------------------------
+--CODL 03/17/2020 Blocking of Duplicate Item Name 
+IF (:transaction_type='A' or :transaction_type='U') AND (:Object_type = '4') THEN
+	SELECT "ItemName" INTO ItemName
+	FROM OITM
+	WHERE "ItemCode"=:list_of_cols_val_tab_del;
+		
+		SELECT COUNT(*) INTO Count1 FROM OITM WHERE "ItemName" = :ItemName;
+
+			IF Count1 > 1 THEN
+				error := 147023;
+				error_message := 'Item Name already exists, please check!';
+			END IF;
+
+END IF;
+-------------------------------------------------------------------------------------
+--Block creation of AP Invoice if Vendor Reference is Blank
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '18' and error = 0) THEN
+
+SELECT COUNT (a."DocEntry") INTO Count1 FROM OPCH a
+     WHERE a. "DocEntry" = list_of_cols_val_tab_del AND IFNULL (a."NumAtCard",'') = '';
+        IF Count1 > 0 THEN
+           error := 130006;
+           error_message := 'No reference indicated';
+        END IF;  
+           
+END IF;
+
+
+
+
+---------------------------------------------------------------------------------------
+--Block creation of PO if Vendor Reference is Blank
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '22' and error = 0) THEN
+
+SELECT COUNT (a."DocEntry") INTO Count1 FROM OPOR a
+     WHERE a. "DocEntry" = list_of_cols_val_tab_del AND IFNULL (a."NumAtCard",'') = '';
+        IF Count1 > 0 THEN
+           error := 130011;
+           error_message := 'No reference indicated';
+        END IF;  
+           
+END IF;
+---------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+--CODL 03/18/2020 Require Foreign Name in BP
+IF :object_type = '2' AND (:transaction_type = 'A' OR :transaction_type = 'U') THEN 
+ SELECT "frozenFor", "CardFName" INTO frozenFor, CardFName
+ FROM OCRD
+ WHERE "CardCode" = list_of_cols_val_tab_del;
+	IF :frozenFor = 'N' THEN
+		IF IFNULL(:CardFName,'') = '' THEN
+		error := 147026;
+		error_message := 'BP Foreign Name is required, please indicate!';
+		END IF;
+	END IF;
+END IF;
+
+--------------------------------------------------------------------------------------------------------------------------------
+--CODL 03/18/2020 Require Foreign Name in Item
+/*IF :object_type = '4' AND (:transaction_type = 'A' OR :transaction_type = 'U') THEN 
+ SELECT "frozenFor", "FrgnName" INTO frozenFor, FrgnName
+ FROM OITM
+ WHERE "ItemCode" = list_of_cols_val_tab_del;
+	IF :frozenFor = 'N' THEN
+		IF IFNULL(:FrgnName,'') = '' THEN
+		error := 147027;
+		error_message := 'Item Foreign Name is required, please indicate!';
+		END IF;
+	END IF;
+END IF;*/
+----------------------------------------------------------------------------------------
+--Blocking of AR Credit Memo without AR Invoice Reference (JP04/01/2020)
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '14' and error = 0) THEN
+SELECT a."BaseRef", a."DocEntry",b."DocType" INTO BaseRef, DocEntry, DocType FROM RIN1 a
+INNER JOIN ORIN b ON a."DocEntry" = b."DocEntry"
+WHERE a."DocEntry" = list_of_cols_val_tab_del;
+	IF :DocType = 'I' THEN
+		IF IFNULL(:BaseRef,'') = '' THEN
+			error := 147028;
+			error_message := 'You cannot allowed create AR Credit Memo document without AR Invoice reference!';
+		END IF;
+	END IF;
+END IF;
+
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+--THIS SHOULD BE ALWAYS AT THE BOTTOM PART OF THE SCRIPT ( CPA 3/26/2020 )
+/*IF (:object_type = '22' AND :transaction_type = 'A' and :error = 0) THEN
+
+	SELECT "U_APP_IsDBTran" INTO isDBTran 
+	FROM "OPOR" 
+	WHERE DocEntry = list_of_cols_val_tab_del;
+	
+	IF isDBTran = '1' THEN
+	
+		INSERT INTO "@APP_INTRCMPY_LOGS" ("Code", "Name", "U_PODocEntry", "U_CreatedDate", "U_SyncStatus")
+		VALUES ((SELECT FNAPP_RE_GENERATECODE() FROM DUMMY) ,(SELECT FNAPP_RE_GENERATECODE() FROM DUMMY), 
+			list_of_cols_val_tab_del, 
+			(SELECT TO_VARCHAR(CURRENT_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS') FROM DUMMY), 
+			'0'
+			);
+	
+	END IF;
+
+END IF;
+*/
+-----------------------------------------------------------------------------------------------------------
+--Blocking on Delivery if Payment Terms is COD (JP04/07/2020)
+IF :object_type = '15' AND (:transaction_type = 'A' OR :transaction_type = 'U') THEN 
+ SELECT "GroupNum" INTO GroupNum
+ FROM ODLN
+ WHERE "DocEntry" = list_of_cols_val_tab_del;
+	IF :GroupNum = '1' THEN
+		error := 147030;
+		error_message := 'Payment Term - COD should be used only in AR Reserve!';
+	END IF;
+END IF;
+-----------------------------------------------------------------------------------------------------------
+--Blocking of AR Invoice if Dimensions are Blank (JP)4/8/2020
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '13' and error = 0) THEN
+ 	SELECT COUNT(a."DocEntry") INTO Count1 FROM INV1 a 
+ 	INNER JOIN OINV B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130029;
+			error_message := 'Kindly specify a Division';
+		END IF;
+	
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM INV1 a 
+ 	INNER JOIN OINV B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode2",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130029;
+			error_message := 'Kindly specify a Group';
+		END IF;
+		
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM INV1 a 
+ 	INNER JOIN OINV B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode3",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130030;
+			error_message := 'Kindly specify a Operating Segment';
+		END IF;
+	
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM INV1 a 
+ 	INNER JOIN OINV B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode4",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130031;
+			error_message := 'Kindly specify a Farming Activities';
+		END IF;
+END IF;
+----------------------------------------------------------------------------------------------------------
+--Blocking of SO Invoice if Dimensions are Blank (JP)4/8/2020
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '17' and error = 0) THEN
+ 	SELECT COUNT(a."DocEntry") INTO Count1 FROM RDR1 a 
+ 	INNER JOIN ORDR B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130029;
+			error_message := 'Kindly specify a Division';
+		END IF;
+	
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM RDR1 a 
+ 	INNER JOIN ORDR B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode2",'') = '' 
+		and b."DataSource" = 'I';  
+	SELECT "DataSource" INTO DataSrc
+	FROM ORDR where "DocEntry" = list_of_cols_val_tab_del;
+		IF Count1 > 0 THEN
+			error := 130029;
+			error_message := 'Kindly specify a Group' || DataSrc;
+		END IF;
+END IF;
+-----------------------------------------------------------------------------------------------
+--Blocking of Goods Receipt if Dimensions are Blank (JP) 4/8/2020
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '59' and error = 0) THEN
+ 	SELECT COUNT(a."DocEntry") INTO Count1 FROM IGN1 a 
+ 	INNER JOIN OIGN B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130032;
+			error_message := 'Kindly specify a Division';
+		END IF;
+	
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM IGN1 a 
+ 	INNER JOIN OIGN B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode2",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130033;
+			error_message := 'Kindly specify a Group';
+		END IF;
+		
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM IGN1 a 
+ 	INNER JOIN OIGN B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode3",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130034;
+			error_message := 'Kindly specify a Operating Segment';
+		END IF;
+	
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM IGN1 a 
+ 	INNER JOIN OIGN B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode4",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130035;
+			error_message := 'Kindly specify a Farming Activities';
+		END IF;
+END IF;
+------------------------------------------------------------------------------------
+--Blocking of Goods Issue if Dimensions are Blank (JP) 4/8/2020
+IF ((:transaction_type = 'A' OR :transaction_type = 'U') AND :object_type = '60' and error = 0) THEN
+ 	SELECT COUNT(a."DocEntry") INTO Count1 FROM IGE1 a 
+ 	INNER JOIN OIGE B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130032;
+			error_message := 'Kindly specify a Division';
+		END IF;
+	
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM IGE1 a 
+ 	INNER JOIN OIGE B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode2",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130033;
+			error_message := 'Kindly specify a Group';
+		END IF;
+		
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM IGE1 a 
+ 	INNER JOIN OIGE B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode3",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130034;
+			error_message := 'Kindly specify a Operating Segment';
+		END IF;
+	
+	SELECT COUNT(a."DocEntry") INTO Count1 FROM IGE1 a 
+ 	INNER JOIN OIGE B ON a."DocEntry" = b."DocEntry" 
+ 	INNER JOIN OITM C ON a."ItemCode" = C."ItemCode"
+		WHERE a."DocEntry" = list_of_cols_val_tab_del AND IFNULL(a."OcrCode4",'') = '';  
+		IF Count1 > 0 THEN
+			error := 130035;
+			error_message := 'Kindly specify a Farming Activities';
+		END IF;
+END IF;
+
+
+-----------------------------------------------------------------------------------------
+-- Select the return values
+select :error, :error_message FROM dummy;
+
+end;
