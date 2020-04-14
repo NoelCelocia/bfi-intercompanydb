@@ -83,10 +83,6 @@ let postOptionREV = {
     'body': ""
 }
 
-let deleteOptionDraftBFI = {
-
-}
-
 const loginBFI = new Promise((resolve, reject) => {
     request(loginOptionBFI, (logerror, logresponse) => {
         if (logerror) reject(logerror);
@@ -115,7 +111,7 @@ let getDocumentPO = async function (docEntry) {
 
         let getPO = JSON.parse(JSON.stringify(getPODetails));
 
-        getPO.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=REVIVE_APPTECH_INTERNAL&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=' + docEntry + '&value2&value3&value4';
+        getPO.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName='+ process.env.REV_COMPANY +'&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=' + docEntry + '&value2&value3&value4';
 
         request(getPO, (err, resp) => {
             if (err) reject(err); //reject("Error on getDocumentPO");
@@ -169,15 +165,17 @@ let addDraft = async function (addDraftOption) {
 let postBFI = async () => {
     return new Promise((resolve, reject) => {
         request(postOptionBFI, (errpost, resppost) => {
-            if (errpost) reject({
+            if (errpost) resolve({
                 error: "-1005",
                 errorDesc: JSON.stringify(errpost)
-            }); //return setTimeout(() => reject("Error : Request to POST in Engine Script BFI Purchase Order"), 500);
+            }); 
             if (JSON.parse(resppost.body).error) {
-                reject(JSON.parse(resppost.body).error); //return setTimeout(() => reject(`SAP Error on Posting BFI PO from REV PO DocEntry ${docEntry}: \t${JSON.parse(resppost.body).error.message.value}  `), 500);
-                //throw new Error(JSON.parse(resppost.body).error.message.value);
+                resolve({
+                    error: "-1006",
+                    errorDesc: JSON.stringify(JSON.parse(resppost.body).error)
+                }); 
             } else {
-                resolve(resppost); //return setTimeout(() => resolve(JSON.parse(resppost.body).BFIPurchaseOrder.body.DocNum), 500);
+                resolve(resppost); 
             }
         });
     });
@@ -198,6 +196,24 @@ let postREV = async () => {
                 });
             }
             resolve(resppost);
+        });
+    });
+}
+
+let postStatREV = async (poDocEntry, errCode, errDesc) => {
+    return new Promise((resolve, reject) => {
+
+        let updateStat = JSON.parse(JSON.stringify(getPODetails));
+
+        if (errCode === "1"){ //error
+            updateStat.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY +'&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2='+ errCode +'&value3='+errDesc +'&value4';
+        }else{
+            updateStat.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY +'&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2='+ errCode +'&value3&value4';
+        }
+        // updateStat.url = encodeURIComponent(updateStat.url);
+        request(updateStat, (err, resp) => {
+            if (err) resolve({error: "-1"}); //reject("Error on getDocumentPO");
+            resolve(resp.body);
         });
     });
 }
@@ -247,27 +263,32 @@ async function start() {
                 //----PURCHASE ORDER DRAFT
                 bodyPurchaseOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
                 bodyPurchaseOrder.CardCode = process.env.PO_CARDCODE;
-                bodyPurchaseOrder.Comments = `CPA TEST`; //`Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
+                bodyPurchaseOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
                 bodyPurchaseOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
                 bodyPurchaseOrder.U_APP_IsDBTran = "1";
+                bodyPurchaseOrder.U_APP_PORef = U_DocEntry
                 bodyPurchaseOrder.DocObjectCode = "22";
                 postOptionBFI.headers.Cookie = bfiCookie;
                 postOptionBFI.body = JSON.stringify(bodyPurchaseOrder);
 
                 //----SALES ORDER
                 bodySalesOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
-                bodySalesOrder.CardCode = "C1000061";
+                bodySalesOrder.CardCode = process.env.SO_CARDCODE;
                 bodySalesOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
                 bodySalesOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
                 bodySalesOrder.U_APP_IsDBTran = "1";
                 postOptionREV.headers.Cookie = revCookie;
-
                 postOptionREV.body = JSON.stringify(bodySalesOrder);
 
             }
 
             await startRowLoop();
             let postBFIres = await postBFI();
+            if (postBFIres.error){
+                //tag as error
+                let stat = await postStatREV(U_DocEntry, "1", postBFIres.error);
+                return;
+            }
             sPostedDraftDocEntry = JSON.parse(postBFIres.body).DocEntry;
             let postREVres = await postREV();
 
@@ -281,12 +302,16 @@ async function start() {
                 console.log(removeDraftOption);
                 let deleteDraftBFIres = await removeDraft(JSON.parse(JSON.stringify(removeDraftOption)));
                 console.log(deleteDraftBFIres);
+
+                //tag as error
+                let stat2 = await postStatREV(U_DocEntry, "1", postREVres.errorDesc.message.value);
+                return;
             } else {
                 let addDraftOption = {};
                 addDraftOption.method = "POST";
                 addDraftOption.url = `${process.env.SL_BASE_URL}/DraftsService_SaveDraftToDocument`;
                 addDraftOption.headers = {
-                    "Cookie" : bfiCookie
+                    "Cookie": bfiCookie
                 }
                 addDraftOption.body = JSON.stringify({
                     "Document": {
@@ -298,32 +323,9 @@ async function start() {
 
             }
 
-            // await postBFI()
-            //     .then((res) => {
-            //         sPostedDraftDocEntry = JSON.parse(res.body).DocEntry;
-            //         console.log(chalk.green(`BFI Purchase Order Draft Number : ${JSON.parse(res.body).DocEntry}`));
-
-            //         await postREV();
-
-
-            //     }).then((res) => {
-            //         console.log(res);
-            //     }).catch((err) => {
-            //         console.log(err);
-            //     });
-
-            // await postREV()
-            // .then((res) => {
-            //     console.log(`REV Sales Order Number : ${JSON.parse(res.body).DocEntry}`);
-            // }).catch((err) => {
-            //     console.log(chalk.red(err));
-            // });
 
             console.log(`Done processing ${e.U_PODocEntry}`);
 
-
-            // // console.log(JSON.parse(poDetail)[0].DocNum);
-            // console.log("-------");
 
         })
 
