@@ -1,5 +1,5 @@
 const request = require('request');
-require('custom-env').env('dev');
+require('custom-env').env('dev2');
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 require("tls").DEFAULT_MIN_VERSION = "TLSv1";
 const chalk = require('chalk');
@@ -170,6 +170,7 @@ let postBFI = async () => {
                 errorDesc: JSON.stringify(errpost)
             }); 
             if (JSON.parse(resppost.body).error) {
+                console.log(JSON.stringify(JSON.parse(resppost.body)));
                 resolve({
                     error: "-1006",
                     errorDesc: JSON.stringify(JSON.parse(resppost.body).error)
@@ -235,13 +236,15 @@ async function start() {
         revCookie = res[1];
         aSyncList = res[2];
 
+        console.log(`Number of records to be sync: ${aSyncList.length}`);
         asyncForEach(aSyncList, async (e) => {
 
             let sPostedDraftDocEntry = "";
 
             let U_DocEntry = e.U_PODocEntry;
+            // let U_PODocNum = e.U_PODocNum;
+            // console.log(`Processing DocEntry: ${U_DocEntry} | DocNum : ${U_PODocEntry}`);
             let poDetail = await getDocumentPO(U_DocEntry);
-            // console.log(poDetail);
 
             var bodySalesOrder = {},
                 bodyPurchaseOrder = {};
@@ -249,8 +252,7 @@ async function start() {
                 bodyPurchaseOrder.DocumentLines = [];
 
             const startRowLoop = async () => {
-                console.log("startRowLoop");
-
+                
                 await asyncForEach(JSON.parse(poDetail), async (ee) => {
                     var oItem = {};
                     oItem.ItemCode = ee.ItemCode;
@@ -262,12 +264,14 @@ async function start() {
                 })
                 //----PURCHASE ORDER DRAFT
                 bodyPurchaseOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
+                bodyPurchaseOrder.U_APP_Farmer = JSON.parse(poDetail)[0].CardCode;
                 bodyPurchaseOrder.CardCode = process.env.PO_CARDCODE;
                 bodyPurchaseOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
                 bodyPurchaseOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
                 bodyPurchaseOrder.U_APP_IsDBTran = "1";
                 bodyPurchaseOrder.U_APP_PORef = U_DocEntry
                 bodyPurchaseOrder.DocObjectCode = "22";
+                bodyPurchaseOrder.U_FSQRTransID = JSON.parse(poDetail)[0].U_FSQRTransID;
                 postOptionBFI.headers.Cookie = bfiCookie;
                 postOptionBFI.body = JSON.stringify(bodyPurchaseOrder);
 
@@ -285,8 +289,11 @@ async function start() {
             await startRowLoop();
             let postBFIres = await postBFI();
             if (postBFIres.error){
+                console.log(JSON.stringify(postBFIres.error));
+                
                 //tag as error
-                let stat = await postStatREV(U_DocEntry, "1", postBFIres.error);
+                let stat = await postStatREV(U_DocEntry, "1", postBFIres.errorDesc);
+                console.log("Error on posting BFI Draft Purchase Order");
                 return;
             }
             sPostedDraftDocEntry = JSON.parse(postBFIres.body).DocEntry;
@@ -319,7 +326,10 @@ async function start() {
                     }
                 });
                 let addActualDraftBFIres = await addDraft(JSON.parse(JSON.stringify(addDraftOption)));
-                console.log(addActualDraftBFIres);
+                
+                
+                let stat = await postStatREV(U_DocEntry, "2", "Success"); 
+                
 
             }
 
