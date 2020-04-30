@@ -83,6 +83,16 @@ let postOptionREV = {
     'body': ""
 }
 
+let postOptionREVBlanket = {
+    "method": "POST",
+    "url": process.env.SL_BASE_URL + "/BlanketAgreements",
+    "headers": {
+        "Content-Type": "application/json",
+        "Cookie": ""
+    },
+    "body": ""
+}
+
 const loginBFI = new Promise((resolve, reject) => {
     request(loginOptionBFI, (logerror, logresponse) => {
         if (logerror) reject(logerror);
@@ -201,6 +211,25 @@ let postREV = async () => {
     });
 }
 
+let postREVBlanket = async () => {
+    return new Promise((resolve, reject) => {
+
+        request(postOptionREVBlanket, (errpost, resppost) => {
+            if (errpost) resolve({
+                error: "-1005",
+                errorDesc: errpost
+            });
+            if (JSON.parse(resppost.body).error) {
+                resolve({
+                    error: "-1006",
+                    errorDesc: JSON.parse(resppost.body).error
+                });
+            }
+            resolve(resppost);
+        });
+    });
+}
+
 let postStatREV = async (poDocEntry, errCode, errDesc) => {
     return new Promise((resolve, reject) => {
 
@@ -235,7 +264,7 @@ async function start() {
         bfiCookie = res[0];
         revCookie = res[1];
         aSyncList = res[2];
-
+        console.log("--------------------------------------");
         console.log(`Number of records to be sync: ${aSyncList.length}`);
         asyncForEach(aSyncList, async (e) => {
 
@@ -247,20 +276,28 @@ async function start() {
             let poDetail = await getDocumentPO(U_DocEntry);
 
             var bodySalesOrder = {},
-                bodyPurchaseOrder = {};
+                bodyPurchaseOrder = {},
+                bodyBlanketAgreement = {};
             bodySalesOrder.DocumentLines = [],
-                bodyPurchaseOrder.DocumentLines = [];
+                bodyPurchaseOrder.DocumentLines = [],
+                bodyBlanketAgreement.BlanketAgreements_ItemsLines = [];
 
             const startRowLoop = async () => {
                 
                 await asyncForEach(JSON.parse(poDetail), async (ee) => {
-                    var oItem = {};
+                    var oItem = {}, oItemBA = {};
                     oItem.ItemCode = ee.ItemCode;
                     oItem.Quantity = ee.Quantity;
                     oItem.UnitPrice = ee.Price;
                     oItem.WarehouseCode = ee.WhsCode;
+                    //------
+                    oItemBA.ItemNo = ee.ItemCode;
+                    oItemBA.PlannedQuantity = ee.Quantity;
+                    oItemBA.UnitPrice = ee.Price;
+                    //------
                     bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
                     bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
+                    bodyBlanketAgreement.BlanketAgreements_ItemsLines.push(JSON.parse(JSON.stringify(oItemBA)));
                 })
                 //----PURCHASE ORDER DRAFT
                 bodyPurchaseOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
@@ -284,6 +321,18 @@ async function start() {
                 postOptionREV.headers.Cookie = revCookie;
                 postOptionREV.body = JSON.stringify(bodySalesOrder);
 
+                //-----BLANKET AGREEMENT REVIVE
+                bodyBlanketAgreement.Status = "asDraft";
+                bodyBlanketAgreement.BPCode = process.env.SO_CARDCODE;
+                bodyBlanketAgreement.StartDate = JSON.parse(poDetail)[0].DocDueDate;
+                bodyBlanketAgreement.EndDate= JSON.parse(poDetail)[0].DocDueDate;
+                bodyBlanketAgreement.SigningDate = JSON.parse(poDetail)[0].DocDueDate;
+                bodyBlanketAgreement.AgreementType = "atGeneral";
+                bodyBlanketAgreement.Description = `FSQR Trans ID : ${JSON.parse(poDetail)[0].U_FSQRTransID}`;
+                bodyBlanketAgreement.Remarks = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
+                postOptionREVBlanket.headers.Cookie = revCookie;
+                postOptionREVBlanket.body = JSON.stringify(bodyBlanketAgreement);
+
             }
 
             await startRowLoop();
@@ -297,9 +346,10 @@ async function start() {
                 return;
             }
             sPostedDraftDocEntry = JSON.parse(postBFIres.body).DocEntry;
-            let postREVres = await postREV();
+            // let postREVres = await postREV();
+            let postREVresBlanket = await postREVBlanket();
 
-            if (postREVres.error) {
+            if (postREVresBlanket.error) {
                 let removeDraftOption = {};
                 removeDraftOption.method = "DELETE";
                 removeDraftOption.url = `${process.env.SL_BASE_URL}/Drafts(${sPostedDraftDocEntry})`;
@@ -311,7 +361,7 @@ async function start() {
                 console.log(deleteDraftBFIres);
 
                 //tag as error
-                let stat2 = await postStatREV(U_DocEntry, "1", postREVres.errorDesc.message.value);
+                let stat2 = await postStatREV(U_DocEntry, "1", postREVresBlanket.errorDesc.message.value);
                 return;
             } else {
                 let addDraftOption = {};
