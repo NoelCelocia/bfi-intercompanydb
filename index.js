@@ -290,6 +290,9 @@ async function start() {
                     oItem.Quantity = ee.Quantity;
                     oItem.UnitPrice = ee.Price;
                     oItem.WarehouseCode = ee.WhsCode;
+                    console.log(ee.VatGroup);
+                    oItem.VatGroup = ee.VatGroup;
+
                     //------
                     oItemBA.ItemNo = ee.ItemCode;
                     oItemBA.PlannedQuantity = ee.Quantity;
