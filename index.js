@@ -44,6 +44,15 @@ let getForSyncOption = {
     }
 };
 
+let getPriceOption = {
+    'method': 'GET',
+    'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getPricePerItemVendor&value1=XXX&value2=YYY&value3&value4',
+    'headers': {
+        'Authorization': `Basic ${base64XSJSCredential}`
+    }
+}
+
+
 let getPODetails = {
     'method': 'GET',
     'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=REVIVE_APPTECH_INTERNAL&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=&value2&value3&value4',
@@ -121,13 +130,22 @@ let getDocumentPO = async function (docEntry) {
 
         let getPO = JSON.parse(JSON.stringify(getPODetails));
 
-        getPO.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName='+ process.env.REV_COMPANY +'&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=' + docEntry + '&value2&value3&value4';
+        getPO.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=' + docEntry + '&value2&value3&value4';
 
         request(getPO, (err, resp) => {
             if (err) reject(err); //reject("Error on getDocumentPO");
             resolve(resp.body);
         });
     });
+}
+
+let getPrice = async function () {
+    return new Promise((resolve, reject) => {
+        request(getPriceOption, (err, resp) => {
+            if (err) reject(err);
+            resolve(resp.body);
+        })
+    })
 }
 
 let postBFIDraft = async function () {
@@ -178,15 +196,15 @@ let postBFI = async () => {
             if (errpost) resolve({
                 error: "-1005",
                 errorDesc: JSON.stringify(errpost)
-            }); 
+            });
             if (JSON.parse(resppost.body).error) {
                 console.log(JSON.stringify(JSON.parse(resppost.body)));
                 resolve({
                     error: "-1006",
                     errorDesc: JSON.stringify(JSON.parse(resppost.body).error)
-                }); 
+                });
             } else {
-                resolve(resppost); 
+                resolve(resppost);
             }
         });
     });
@@ -235,14 +253,16 @@ let postStatREV = async (poDocEntry, errCode, errDesc) => {
 
         let updateStat = JSON.parse(JSON.stringify(getPODetails));
 
-        if (errCode === "1"){ //error
-            updateStat.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY +'&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2='+ errCode +'&value3='+errDesc +'&value4';
-        }else{
-            updateStat.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY +'&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2='+ errCode +'&value3&value4';
+        if (errCode === "1") { //error
+            updateStat.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2=' + errCode + '&value3=' + errDesc + '&value4';
+        } else {
+            updateStat.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2=' + errCode + '&value3&value4';
         }
         // updateStat.url = encodeURIComponent(updateStat.url);
         request(updateStat, (err, resp) => {
-            if (err) resolve({error: "-1"}); //reject("Error on getDocumentPO");
+            if (err) resolve({
+                error: "-1"
+            }); //reject("Error on getDocumentPO");
             resolve(resp.body);
         });
     });
@@ -283,15 +303,21 @@ async function start() {
                 bodyBlanketAgreement.BlanketAgreements_ItemsLines = [];
 
             const startRowLoop = async () => {
-                
+
                 await asyncForEach(JSON.parse(poDetail), async (ee) => {
-                    var oItem = {}, oItemBA = {};
+                    var oItem = {},
+                        oItemBA = {};
                     oItem.ItemCode = ee.ItemCode;
                     oItem.Quantity = ee.Quantity;
-                    oItem.UnitPrice = ee.Price;
                     oItem.WarehouseCode = ee.WhsCode;
-                    console.log(ee.VatGroup);
-                    oItem.VatGroup = ee.VatGroup;
+                    oItem.VatGroup = "IVAT-E";
+                    oItem.U_APP_BlankAgr = ee.U_APP_BlankAgr;
+                    getPriceOption.url = getPriceOption.url.replace("XXX", ee.ItemCode).replace("YYY", process.env.PO_CARDCODE);
+                    let iPrice = await getPrice();
+                    iPrice = JSON.parse(iPrice.replace("[", "").replace("]", "")).Price;
+                    oItem.UnitPrice = iPrice; //ee.Price;
+                    oItem.OcrCode = "01";
+                    oItem.COGSCostingCode = "01";
 
                     //------
                     oItemBA.ItemNo = ee.ItemCode;
@@ -301,6 +327,7 @@ async function start() {
                     bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
                     bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
                     bodyBlanketAgreement.BlanketAgreements_ItemsLines.push(JSON.parse(JSON.stringify(oItemBA)));
+                    getPriceOption.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getPricePerItemVendor&value1=XXX&value2=YYY&value3&value4';
                 })
                 //----PURCHASE ORDER DRAFT
                 bodyPurchaseOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
@@ -328,7 +355,7 @@ async function start() {
                 bodyBlanketAgreement.Status = "asDraft";
                 bodyBlanketAgreement.BPCode = process.env.SO_CARDCODE;
                 bodyBlanketAgreement.StartDate = JSON.parse(poDetail)[0].DocDueDate;
-                bodyBlanketAgreement.EndDate= JSON.parse(poDetail)[0].DocDueDate;
+                bodyBlanketAgreement.EndDate = JSON.parse(poDetail)[0].DocDueDate;
                 bodyBlanketAgreement.SigningDate = JSON.parse(poDetail)[0].DocDueDate;
                 bodyBlanketAgreement.AgreementType = "atGeneral";
                 bodyBlanketAgreement.Description = `FSQR Trans ID : ${JSON.parse(poDetail)[0].U_FSQRTransID}`;
@@ -340,54 +367,34 @@ async function start() {
 
             await startRowLoop();
             let postBFIres = await postBFI();
-            if (postBFIres.error){
+            if (postBFIres.error) {
                 console.log(JSON.stringify(postBFIres.error));
-                
+
                 //tag as error
                 let stat = await postStatREV(U_DocEntry, "1", postBFIres.errorDesc);
                 console.log("Error on posting BFI Draft Purchase Order");
                 return;
             }
             sPostedDraftDocEntry = JSON.parse(postBFIres.body).DocEntry;
-            // let postREVres = await postREV();
-            let postREVresBlanket = await postREVBlanket();
+            var sFSQRID = JSON.parse(postBFIres.body).U_FSQRTransID;
 
-            if (postREVresBlanket.error) {
-                let removeDraftOption = {};
-                removeDraftOption.method = "DELETE";
-                removeDraftOption.url = `${process.env.SL_BASE_URL}/Drafts(${sPostedDraftDocEntry})`;
-                removeDraftOption.headers = {
-                    "Cookie": bfiCookie
-                };
-                console.log(removeDraftOption);
-                let deleteDraftBFIres = await removeDraft(JSON.parse(JSON.stringify(removeDraftOption)));
-                console.log(deleteDraftBFIres);
-
-                //tag as error
-                let stat2 = await postStatREV(U_DocEntry, "1", postREVresBlanket.errorDesc.message.value);
-                return;
-            } else {
-                let addDraftOption = {};
-                addDraftOption.method = "POST";
-                addDraftOption.url = `${process.env.SL_BASE_URL}/DraftsService_SaveDraftToDocument`;
-                addDraftOption.headers = {
-                    "Cookie": bfiCookie
-                }
-                addDraftOption.body = JSON.stringify({
-                    "Document": {
-                        "DocEntry": sPostedDraftDocEntry
-                    }
-                });
-                let addActualDraftBFIres = await addDraft(JSON.parse(JSON.stringify(addDraftOption)));
-                
-                
-                let stat = await postStatREV(U_DocEntry, "2", "Success"); 
-                
-
+            let addDraftOption = {};
+            addDraftOption.method = "POST";
+            addDraftOption.url = `${process.env.SL_BASE_URL}/DraftsService_SaveDraftToDocument`;
+            addDraftOption.headers = {
+                "Cookie": bfiCookie
             }
+            addDraftOption.body = JSON.stringify({
+                "Document": {
+                    "DocEntry": sPostedDraftDocEntry
+                }
+            });
+            let addActualDraftBFIres = await addDraft(JSON.parse(JSON.stringify(addDraftOption)));
 
+            let stat = await postStatREV(U_DocEntry, "2", "Success");
 
-            console.log(`Done processing ${e.U_PODocEntry}`);
+            console.log(`Done processing Revive PO : ${e.U_PODocEntry} - FSQR Transction ID: ${sFSQRID}`);
+
 
 
         })
