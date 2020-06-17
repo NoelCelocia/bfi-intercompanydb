@@ -163,7 +163,7 @@ let removeDraft = async function (removeDraftOption) {
         request(removeDraftOption, (err, res) => {
             if (err) resolve({
                 "errorCode": "-1001",
-                "err": JSON.stringify(err)
+                "err": JSON.stringify(err) 
             });
             resolve(res);
         })
@@ -312,12 +312,22 @@ async function start() {
                     oItem.WarehouseCode = ee.WhsCode;
                     oItem.VatGroup = "IVAT-E";
                     oItem.U_APP_BlankAgr = ee.U_APP_BlankAgr;
+                    
+
                     getPriceOption.url = getPriceOption.url.replace("XXX", ee.ItemCode).replace("YYY", process.env.PO_CARDCODE);
                     let iPrice = await getPrice();
                     iPrice = JSON.parse(iPrice.replace("[", "").replace("]", "")).Price;
                     oItem.UnitPrice = iPrice; //ee.Price;
-                    oItem.OcrCode = "01";
-                    oItem.COGSCostingCode = "01";
+
+                    oItem.OcrCode = ee.U_APP_Division;  //"01";
+                    oItem.OcrCode2 = ee.U_APP_Group;
+                    oItem.OcrCode3 = ee.U_APP_Department;
+                    oItem.OcrCode4 = ee.U_APP_Section;
+                    oItem.CostingCode = ee.U_APP_Division;
+                    oItem.COGSCostingCode = ee.U_APP_Division;
+                    oItem.CostingCode2 = ee.U_APP_Group;
+                    oItem.CostingCode3= ee.U_APP_Department;
+                    oItem.CostingCode4 = ee.U_APP_Section;
 
                     //------
                     oItemBA.ItemNo = ee.ItemCode;
