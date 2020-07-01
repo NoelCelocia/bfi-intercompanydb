@@ -319,7 +319,7 @@ async function start() {
                     iPrice = JSON.parse(iPrice.replace("[", "").replace("]", "")).Price;
                     oItem.UnitPrice = iPrice; //ee.Price;
 
-                    oItem.OcrCode = ee.U_APP_Division;  //"01";
+                    oItem.OcrCode = ee.U_APP_Division;  
                     oItem.OcrCode2 = ee.U_APP_Group;
                     oItem.OcrCode3 = ee.U_APP_Department;
                     oItem.OcrCode4 = ee.U_APP_Section;
