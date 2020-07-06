@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+    app-apinode:
+        build:
+            context: ./
+            dockerfile: Dockerfile
+        container_name: bfi-intercompanydb
+        restart: always
+        volumes:
+            - ./:/usr/src/api
+            - bfi-intercompanydb_node_modules:/usr/src/api/node_modules
+        ports:
+            - 3002:3002
+
+volumes:
+    bfi-intercompanydb_node_modules:

@@ -190,6 +190,7 @@ let addDraft = async function (addDraftOption) {
     });
 }
 
+
 let postBFI = async () => {
     return new Promise((resolve, reject) => {
         request(postOptionBFI, (errpost, resppost) => {
@@ -277,7 +278,7 @@ const asyncForEach = async (array, callback) => {
 async function start() {
 
     Promise.all([
-        loginBFI,
+        loginBFI, 
         loginREV,
         getForSync
     ]).then((res) => {
@@ -286,6 +287,8 @@ async function start() {
         aSyncList = res[2];
         console.log("--------------------------------------");
         console.log(`Number of records to be sync: ${aSyncList.length}`);
+        //3
+
         asyncForEach(aSyncList, async (e) => {
 
             let sPostedDraftDocEntry = "";
@@ -313,11 +316,11 @@ async function start() {
                     oItem.VatGroup = "IVAT-E";
                     oItem.U_APP_BlankAgr = ee.U_APP_BlankAgr;
                     
-
-                    getPriceOption.url = getPriceOption.url.replace("XXX", ee.ItemCode).replace("YYY", process.env.PO_CARDCODE);
-                    let iPrice = await getPrice();
-                    iPrice = JSON.parse(iPrice.replace("[", "").replace("]", "")).Price;
-                    oItem.UnitPrice = iPrice; //ee.Price;
+                    // getPriceOption.url = getPriceOption.url.replace("XXX", ee.ItemCode).replace("YYY", process.env.PO_CARDCODE);
+                    // let iPrice = await getPrice();
+                    // iPrice = JSON.parse(iPrice.replace("[", "").replace("]", "")).Price;
+                    // oItem.UnitPrice = iPrice; //ee.Price;
+                    oItem.UnitPrice = ee.Price;
 
                     oItem.OcrCode = ee.U_APP_Division;  
                     oItem.OcrCode2 = ee.U_APP_Group;
@@ -377,7 +380,7 @@ async function start() {
             }
 
             await startRowLoop();
-            let postBFIres = await postBFI();
+            let postBFIres = await postBFI(); //Draft Purchase Order in BFI
             if (postBFIres.error) {
                 console.log(JSON.stringify(postBFIres.error));
 
