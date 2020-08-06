@@ -326,7 +326,7 @@ async function start() {
                     oItem.OcrCode2 = ee.U_APP_Group;
                     oItem.OcrCode3 = ee.U_APP_Department;
                     oItem.OcrCode4 = ee.U_APP_Section;
-                    oItem.UomEntry = ee.UomEntry;
+                    oItem.UoMEntry = ee.UomEntry;
                     oItem.CostingCode = ee.U_APP_Division;
                     oItem.COGSCostingCode = ee.U_APP_Division;
                     oItem.CostingCode2 = ee.U_APP_Group;
