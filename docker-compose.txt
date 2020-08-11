@@ -1,0 +1,16 @@
+THIS IS A TEXT FILE ! ! !
+
+version: "3"
+
+services:
+  bfi-intercompanydb:
+    build:
+      context: ./bfi-intercompanydb
+      dockerfile: Dockerfile
+    container_name: scenario-a-dev
+    restart: always
+    volumes:
+      - ./bfi-intercompanydb:/usr/src/api
+      - bfi-intercompanydb_node_modules:/usr/src/api/node_modules
+volumes:
+  bfi-intercompanydb_node_modules:
