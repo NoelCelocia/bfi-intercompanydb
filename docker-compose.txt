@@ -33,3 +33,20 @@ services:
       - bfi-intercompanydb_sqa_node_modules:/usr/src/api/node_modules
 volumes:
   bfi-intercompanydb_sqa_node_modules:
+
+# uat
+
+version: "3"
+
+services:
+  bfi-intercompanydb:
+    build:
+      context: ./bfi-intercompanydb
+      dockerfile: Dockerfile
+    container_name: scenario-a-uat
+    restart: always
+    volumes:
+      - ./bfi-intercompanydb:/usr/src/api
+      - bfi-intercompanydb_uat_node_modules:/usr/src/api/node_modules
+volumes:
+  bfi-intercompanydb_uat_node_modules:
