@@ -1,5 +1,7 @@
 THIS IS A TEXT FILE ! ! !
 
+# dev
+
 version: "3"
 
 services:
@@ -11,6 +13,23 @@ services:
     restart: always
     volumes:
       - ./bfi-intercompanydb:/usr/src/api
-      - bfi-intercompanydb_node_modules:/usr/src/api/node_modules
+      - bfi-intercompanydb_dev_node_modules:/usr/src/api/node_modules
 volumes:
-  bfi-intercompanydb_node_modules:
+  bfi-intercompanydb_dev_node_modules:
+
+# sqa
+
+version: "3"
+
+services:
+  bfi-intercompanydb:
+    build:
+      context: ./bfi-intercompanydb
+      dockerfile: Dockerfile
+    container_name: scenario-a-sqa
+    restart: always
+    volumes:
+      - ./bfi-intercompanydb:/usr/src/api
+      - bfi-intercompanydb_sqa_node_modules:/usr/src/api/node_modules
+volumes:
+  bfi-intercompanydb_sqa_node_modules:
