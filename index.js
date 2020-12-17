@@ -1,5 +1,5 @@
 const request = require('request');
-require('custom-env').env('dev2');
+require('custom-env').env('dev2', '/usr/src/app');
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 require("tls").DEFAULT_MIN_VERSION = "TLSv1";
 const chalk = require('chalk');
