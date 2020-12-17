@@ -9,6 +9,7 @@ let bfiCookie = [];
 let revCookie = [];
 let aSyncList = [];
 
+//Compose request for login in BFI
 let loginOptionBFI = {
     'method': 'POST',
     'url': process.env.SL_BASE_URL + '/Login',
@@ -22,7 +23,7 @@ let loginOptionBFI = {
     })
 
 };
-
+//Compose request for login in Revive
 let loginOptionREV = {
     'method': 'POST',
     'url': process.env.SL_BASE_URL + '/Login',
@@ -35,7 +36,7 @@ let loginOptionREV = {
         "UserName": process.env.SL_USERNAME_REV
     })
 };
-
+//Get unsynced PO from revive
 let getForSyncOption = {
     'method': 'GET',
     'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getlogs&value1=0&value2&value3&value4',
@@ -43,7 +44,7 @@ let getForSyncOption = {
         'Authorization': 'Basic ' + base64XSJSCredential
     }
 };
-
+//get Price per item
 let getPriceOption = {
     'method': 'GET',
     'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getPricePerItemVendor&value1=XXX&value2=YYY&value3&value4',
@@ -52,7 +53,7 @@ let getPriceOption = {
     }
 }
 
-
+//Get OPEN PO from revive
 let getPODetails = {
     'method': 'GET',
     'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=REVIVE_APPTECH_INTERNAL&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=&value2&value3&value4',
@@ -60,7 +61,7 @@ let getPODetails = {
         'Authorization': 'Basic ' + base64XSJSCredential
     }
 };
-
+//Compose Draft Request
 let postOptionBFIDraft = {
     'method': 'POST',
     'url': process.env.SL_BASE_URL + '/Drafts',
@@ -81,41 +82,21 @@ let postOptionBFI = {
     },
     'body': ""
 }
-
-let postOptionREV = {
-    'method': 'POST',
-    'url': process.env.SL_BASE_URL + '/Orders',
-    'headers': {
-        'Content-Type': 'application/json',
-        'Cookie': ''
-    },
-    'body': ""
-}
-
-let postOptionREVBlanket = {
-    "method": "POST",
-    "url": process.env.SL_BASE_URL + "/BlanketAgreements",
-    "headers": {
-        "Content-Type": "application/json",
-        "Cookie": ""
-    },
-    "body": ""
-}
-
+//Login to BFI
 const loginBFI = new Promise((resolve, reject) => {
     request(loginOptionBFI, (logerror, logresponse) => {
         if (logerror) reject(logerror);
         resolve(logresponse.headers["set-cookie"]);
     });
 });
-
+//Login to Revive
 const loginREV = new Promise((resolve, reject) => {
     request(loginOptionREV, (logerror, logresponse) => {
         if (logerror) reject(logerror);
         resolve(logresponse.headers["set-cookie"]);
     });
 });
-
+//Get unsynced PO from revive
 const getForSync = new Promise((resolve, reject) => {
     request(getForSyncOption, (error, response) => {
         if (error) {
@@ -124,7 +105,7 @@ const getForSync = new Promise((resolve, reject) => {
         resolve(JSON.parse(response.body));
     });
 });
-
+//Get PO
 let getDocumentPO = async function (docEntry) {
     return new Promise((resolve, reject) => {
 
@@ -133,27 +114,8 @@ let getDocumentPO = async function (docEntry) {
         getPO.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=' + docEntry + '&value2&value3&value4';
 
         request(getPO, (err, resp) => {
-            if (err) reject(err); //reject("Error on getDocumentPO");
+            if (err) resolve(err); //reject("Error on getDocumentPO");
             resolve(resp.body);
-        });
-    });
-}
-
-let getPrice = async function () {
-    return new Promise((resolve, reject) => {
-        request(getPriceOption, (err, resp) => {
-            if (err) reject(err);
-            resolve(resp.body);
-        })
-    })
-}
-
-let postBFIDraft = async function () {
-    return new Promise((resolve, reject) => {
-        request(postOptionBFIDraft, (errpost, resppost) => {
-            if (errpost) reject("Error : Request to POST Draft Sales Order");
-            resolve(resppost);
-
         });
     });
 }
@@ -169,7 +131,7 @@ let removeDraft = async function (removeDraftOption) {
         })
     });
 }
-
+//draft service
 let addDraft = async function (addDraftOption) {
     return new Promise((resolve, reject) => {
         request(addDraftOption, (err, res) => {
@@ -190,7 +152,7 @@ let addDraft = async function (addDraftOption) {
     });
 }
 
-
+//Draft PO Posting in BFI
 let postBFI = async () => {
     return new Promise((resolve, reject) => {
         request(postOptionBFI, (errpost, resppost) => {
@@ -210,45 +172,7 @@ let postBFI = async () => {
         });
     });
 }
-
-let postREV = async () => {
-    return new Promise((resolve, reject) => {
-
-        request(postOptionREV, (errpost, resppost) => {
-            if (errpost) resolve({
-                error: "-1003",
-                errorDesc: errpost
-            });
-            if (JSON.parse(resppost.body).error) {
-                resolve({
-                    error: "-1004",
-                    errorDesc: JSON.parse(resppost.body).error
-                });
-            }
-            resolve(resppost);
-        });
-    });
-}
-
-let postREVBlanket = async () => {
-    return new Promise((resolve, reject) => {
-
-        request(postOptionREVBlanket, (errpost, resppost) => {
-            if (errpost) resolve({
-                error: "-1005",
-                errorDesc: errpost
-            });
-            if (JSON.parse(resppost.body).error) {
-                resolve({
-                    error: "-1006",
-                    errorDesc: JSON.parse(resppost.body).error
-                });
-            }
-            resolve(resppost);
-        });
-    });
-}
-
+//Updating of status in "@APP_INTRCMPY_LOGS"
 let postStatREV = async (poDocEntry, errCode, errDesc) => {
     return new Promise((resolve, reject) => {
 
@@ -256,7 +180,7 @@ let postStatREV = async (poDocEntry, errCode, errDesc) => {
 
         if (errCode === "1") { //error
             updateStat.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2=' + errCode + '&value3=' + errDesc + '&value4';
-        } else {
+        } else {//success
             updateStat.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2=' + errCode + '&value3&value4';
         }
         // updateStat.url = encodeURIComponent(updateStat.url);
@@ -274,7 +198,7 @@ const asyncForEach = async (array, callback) => {
         await callback(array[index], index, array)
     }
 }
-
+////
 async function start() {
 
     Promise.all([
@@ -315,33 +239,29 @@ async function start() {
                     oItem.WarehouseCode = ee.WhsCode;
                     oItem.VatGroup = "IVAT-E";
                     oItem.U_APP_BlankAgr = ee.U_APP_BlankAgr;
-                    
-                    // getPriceOption.url = getPriceOption.url.replace("XXX", ee.ItemCode).replace("YYY", process.env.PO_CARDCODE);
-                    // let iPrice = await getPrice();
-                    // iPrice = JSON.parse(iPrice.replace("[", "").replace("]", "")).Price;
-                    // oItem.UnitPrice = iPrice; //ee.Price;
                     oItem.UnitPrice = ee.Price;
 
-                    oItem.OcrCode = ee.U_APP_Division;  
-                    oItem.OcrCode2 = ee.U_APP_Group;
-                    oItem.OcrCode3 = ee.U_APP_Department;
-                    oItem.OcrCode4 = ee.U_APP_Section;
+                    // oItem.OcrCode = ee.U_APP_Division;  
+                    // oItem.OcrCode2 = ee.U_APP_Group;
+                    // oItem.OcrCode3 = ee.U_APP_Department;
+                    // oItem.OcrCode4 = ee.U_APP_Section;
                     oItem.UoMEntry = ee.UomEntry;
-                    oItem.CostingCode = ee.U_APP_Division;
-                    oItem.COGSCostingCode = ee.U_APP_Division;
-                    oItem.CostingCode2 = ee.U_APP_Group;
-                    oItem.CostingCode3= ee.U_APP_Department;
-                    oItem.CostingCode4 = ee.U_APP_Section;
+                    // oItem.CostingCode = ee.U_APP_Division;
+                    // oItem.COGSCostingCode = ee.U_APP_Division;
+                    // oItem.CostingCode2 = ee.U_APP_Group;
+                    // oItem.CostingCode3= ee.U_APP_Department;
+                    // oItem.CostingCode4 = ee.U_APP_Section;
 
                     //------
-                    oItemBA.ItemNo = ee.ItemCode;
-                    oItemBA.PlannedQuantity = ee.Quantity;
-                    oItemBA.UnitPrice = ee.Price;
+                    // oItemBA.ItemNo = ee.ItemCode;
+                    // oItemBA.PlannedQuantity = ee.Quantity;
+                    // oItemBA.UnitPrice = ee.Price;
                     //------
-                    bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
+                    // bodySalesOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
                     bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
-                    bodyBlanketAgreement.BlanketAgreements_ItemsLines.push(JSON.parse(JSON.stringify(oItemBA)));
-                    getPriceOption.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getPricePerItemVendor&value1=XXX&value2=YYY&value3&value4';
+                    // bodyBlanketAgreement.BlanketAgreements_ItemsLines.push(JSON.parse(JSON.stringify(oItemBA)));
+                    // //Get Price Per Item
+                    // getPriceOption.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getPricePerItemVendor&value1=XXX&value2=YYY&value3&value4';
                 })
                 //----PURCHASE ORDER DRAFT
                 bodyPurchaseOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
@@ -355,28 +275,6 @@ async function start() {
                 bodyPurchaseOrder.U_FSQRTransID = JSON.parse(poDetail)[0].U_FSQRTransID;
                 postOptionBFI.headers.Cookie = bfiCookie;
                 postOptionBFI.body = JSON.stringify(bodyPurchaseOrder);
-
-                //----SALES ORDER
-                bodySalesOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
-                bodySalesOrder.CardCode = process.env.SO_CARDCODE;
-                bodySalesOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
-                bodySalesOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
-                bodySalesOrder.U_APP_IsDBTran = "1";
-                postOptionREV.headers.Cookie = revCookie;
-                postOptionREV.body = JSON.stringify(bodySalesOrder);
-
-                //-----BLANKET AGREEMENT REVIVE
-                bodyBlanketAgreement.Status = "asDraft";
-                bodyBlanketAgreement.BPCode = process.env.SO_CARDCODE;
-                bodyBlanketAgreement.StartDate = JSON.parse(poDetail)[0].DocDueDate;
-                bodyBlanketAgreement.EndDate = JSON.parse(poDetail)[0].DocDueDate;
-                bodyBlanketAgreement.SigningDate = JSON.parse(poDetail)[0].DocDueDate;
-                bodyBlanketAgreement.AgreementType = "atGeneral";
-                bodyBlanketAgreement.Description = `FSQR Trans ID : ${JSON.parse(poDetail)[0].U_FSQRTransID}`;
-                bodyBlanketAgreement.Remarks = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
-                postOptionREVBlanket.headers.Cookie = revCookie;
-                postOptionREVBlanket.body = JSON.stringify(bodyBlanketAgreement);
-
             }
 
             await startRowLoop();
