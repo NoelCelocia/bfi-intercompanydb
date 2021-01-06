@@ -39,7 +39,7 @@ let loginOptionREV = {
 //Get unsynced PO from revive
 let getForSyncOption = {
     'method': 'GET',
-    'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getlogs&value1=0&value2&value3&value4',
+    'url': process.env.XSJS_BASE_URL + '/app-xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getlogs&value1=0&value2&value3&value4',
     'headers': {
         'Authorization': 'Basic ' + base64XSJSCredential
     }
@@ -47,7 +47,7 @@ let getForSyncOption = {
 //get Price per item
 let getPriceOption = {
     'method': 'GET',
-    'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getPricePerItemVendor&value1=XXX&value2=YYY&value3&value4',
+    'url': process.env.XSJS_BASE_URL + '/app-xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getPricePerItemVendor&value1=XXX&value2=YYY&value3&value4',
     'headers': {
         'Authorization': `Basic ${base64XSJSCredential}`
     }
@@ -56,7 +56,7 @@ let getPriceOption = {
 //Get OPEN PO from revive
 let getPODetails = {
     'method': 'GET',
-    'url': process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=REVIVE_APPTECH_INTERNAL&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=&value2&value3&value4',
+    'url': process.env.XSJS_BASE_URL + '/app-xsjs/ExecQuery.xsjs?dbName=REVIVE_APPTECH_INTERNAL&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=&value2&value3&value4',
     'headers': {
         'Authorization': 'Basic ' + base64XSJSCredential
     }
@@ -111,7 +111,7 @@ let getDocumentPO = async function (docEntry) {
 
         let getPO = JSON.parse(JSON.stringify(getPODetails));
 
-        getPO.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=' + docEntry + '&value2&value3&value4';
+        getPO.url = process.env.XSJS_BASE_URL + '/app-xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getallpoforbfi&value1=' + docEntry + '&value2&value3&value4';
 
         request(getPO, (err, resp) => {
             if (err) resolve(err); //reject("Error on getDocumentPO");
@@ -179,9 +179,9 @@ let postStatREV = async (poDocEntry, errCode, errDesc) => {
         let updateStat = JSON.parse(JSON.stringify(getPODetails));
 
         if (errCode === "1") { //error
-            updateStat.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2=' + errCode + '&value3=' + errDesc + '&value4';
+            updateStat.url = process.env.XSJS_BASE_URL + '/app-xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2=' + errCode + '&value3=' + errDesc + '&value4';
         } else {//success
-            updateStat.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2=' + errCode + '&value3&value4';
+            updateStat.url = process.env.XSJS_BASE_URL + '/app-xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=updateStat&value1=' + poDocEntry + '&value2=' + errCode + '&value3&value4';
         }
         // updateStat.url = encodeURIComponent(updateStat.url);
         request(updateStat, (err, resp) => {
@@ -261,7 +261,7 @@ async function start() {
                     bodyPurchaseOrder.DocumentLines.push(JSON.parse(JSON.stringify(oItem)));
                     // bodyBlanketAgreement.BlanketAgreements_ItemsLines.push(JSON.parse(JSON.stringify(oItemBA)));
                     // //Get Price Per Item
-                    // getPriceOption.url = process.env.XSJS_BASE_URL + '/app_xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getPricePerItemVendor&value1=XXX&value2=YYY&value3&value4';
+                    // getPriceOption.url = process.env.XSJS_BASE_URL + '/app-xsjs/ExecQuery.xsjs?dbName=' + process.env.REV_COMPANY + '&procName=spAppIntercompany&queryTag=getPricePerItemVendor&value1=XXX&value2=YYY&value3&value4';
                 })
                 //----PURCHASE ORDER DRAFT
                 bodyPurchaseOrder.DocDueDate = JSON.parse(poDetail)[0].DocDueDate;
