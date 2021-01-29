@@ -239,6 +239,7 @@ async function start() {
                     oItem.WarehouseCode = ee.WhsCode;
                     oItem.VatGroup = "IVAT-E";
                     oItem.U_APP_BlankAgr = ee.U_APP_BlankAgr;
+                    oItem.U_APP_ProjCode = ee.U_APP_ProjCode;
                     oItem.UnitPrice = ee.Price;
 
                     // oItem.OcrCode = ee.U_APP_Division;  
@@ -269,6 +270,7 @@ async function start() {
                 bodyPurchaseOrder.CardCode = process.env.PO_CARDCODE;
                 bodyPurchaseOrder.Comments = `Based on REV Purchase Order DocEntry : ${JSON.parse(poDetail)[0].DocEntry} | DocNum : ${JSON.parse(poDetail)[0].DocNum}`;
                 bodyPurchaseOrder.NumAtCard = JSON.parse(poDetail)[0].NumAtCard;
+                bodyPurchaseOrder.U_APP_ProjCode = JSON.parse(poDetail)[0].U_APP_ProjCode;
                 bodyPurchaseOrder.U_APP_IsDBTran = "1";
                 bodyPurchaseOrder.U_APP_PORef = U_DocEntry
                 bodyPurchaseOrder.DocObjectCode = "22";
